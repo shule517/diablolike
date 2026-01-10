@@ -21,6 +21,8 @@ public partial class Player : CharacterBody2D
 	private AnimatedSprite2D? _sprite;
 	private Area2D? _attackArea;
 	private ColorRect? _placeholder;
+	private Vector2 _facingDirection = Vector2.Right;
+	private bool _usingGamepad = false;
 
 	[Signal]
 	public delegate void HealthChangedEventHandler(int currentHealth, int maxHealth);
@@ -70,18 +72,35 @@ public partial class Player : CharacterBody2D
 
 		Vector2 velocity = Vector2.Zero;
 
-		if (Input.IsActionPressed("move_up"))
-			velocity.Y -= 1;
-		if (Input.IsActionPressed("move_down"))
-			velocity.Y += 1;
-		if (Input.IsActionPressed("move_left"))
-			velocity.X -= 1;
-		if (Input.IsActionPressed("move_right"))
-			velocity.X += 1;
+		// Get gamepad stick input directly for smooth analog movement
+		Vector2 stickInput = new Vector2(
+			Input.GetJoyAxis(0, JoyAxis.LeftX),
+			Input.GetJoyAxis(0, JoyAxis.LeftY)
+		);
+
+		// Apply deadzone
+		if (stickInput.Length() > 0.2f)
+		{
+			velocity = stickInput;
+			_usingGamepad = true;
+		}
+		else
+		{
+			// Keyboard input
+			if (Input.IsActionPressed("move_up"))
+				velocity.Y -= 1;
+			if (Input.IsActionPressed("move_down"))
+				velocity.Y += 1;
+			if (Input.IsActionPressed("move_left"))
+				velocity.X -= 1;
+			if (Input.IsActionPressed("move_right"))
+				velocity.X += 1;
+		}
 
 		if (velocity != Vector2.Zero)
 		{
 			velocity = velocity.Normalized() * Speed;
+			_facingDirection = velocity.Normalized();
 			PlayAnimation("walk");
 		}
 		else
@@ -92,12 +111,34 @@ public partial class Player : CharacterBody2D
 		Velocity = velocity;
 		MoveAndSlide();
 
-		// Face mouse direction
-		LookAt(GetGlobalMousePosition());
+		// Face direction based on input type
+		if (_usingGamepad)
+		{
+			// Face movement direction when using gamepad
+			if (_facingDirection != Vector2.Zero)
+			{
+				Rotation = _facingDirection.Angle();
+			}
+		}
+		else
+		{
+			// Face mouse direction when using keyboard/mouse
+			LookAt(GetGlobalMousePosition());
+		}
 	}
 
 	public override void _Input(InputEvent @event)
 	{
+		// Detect input type
+		if (@event is InputEventMouseMotion || @event is InputEventMouseButton)
+		{
+			_usingGamepad = false;
+		}
+		else if (@event is InputEventJoypadButton || @event is InputEventJoypadMotion)
+		{
+			_usingGamepad = true;
+		}
+
 		if (@event.IsActionPressed("attack") && _attackTimer <= 0)
 		{
 			Attack();
@@ -188,7 +229,17 @@ public partial class Player : CharacterBody2D
 		visual.Color = new Color(0.3f, 0.5f, 1.0f, 0.5f);
 		skillEffect.AddChild(visual);
 
-		skillEffect.GlobalPosition = GetGlobalMousePosition();
+		// Set skill position based on input type
+		if (_usingGamepad)
+		{
+			// Place skill in front of player based on facing direction
+			skillEffect.GlobalPosition = GlobalPosition + _facingDirection * 120;
+		}
+		else
+		{
+			skillEffect.GlobalPosition = GetGlobalMousePosition();
+		}
+
 		skillEffect.CollisionLayer = 0;
 		skillEffect.CollisionMask = 2; // Enemy layer
 
