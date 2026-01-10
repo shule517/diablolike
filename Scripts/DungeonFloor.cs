@@ -322,7 +322,7 @@ public partial class DungeonFloor : Node2D
     private void CarveCorridor(Vector2I from, Vector2I to)
     {
         Vector2I current = from;
-        int corridorWidth = _rng.RandiRange(3, 5);
+        int corridorWidth = _rng.RandiRange(4, 6); // Wider corridors (was 3-5)
 
         while (current != to)
         {
@@ -389,57 +389,140 @@ public partial class DungeonFloor : Node2D
 
     private void WidenNarrowPassages()
     {
-        // Find and widen narrow passages
-        bool changed = true;
-        int iterations = 0;
-        int maxIterations = 5;
+        int minPassageWidth = 3; // Minimum 3 tiles wide for player to pass
 
-        while (changed && iterations < maxIterations)
+        // Multiple passes to ensure all passages are wide enough
+        for (int pass = 0; pass < 8; pass++)
         {
-            changed = false;
-            iterations++;
+            bool changed = false;
 
-            for (int x = 2; x < MapWidth - 2; x++)
+            for (int x = 3; x < MapWidth - 3; x++)
             {
-                for (int y = 2; y < MapHeight - 2; y++)
+                for (int y = 3; y < MapHeight - 3; y++)
                 {
                     if (_map[x, y] == 0)
                     {
-                        // Check if this is a narrow horizontal passage
-                        if (_map[x, y - 1] == 1 && _map[x, y + 1] == 1)
-                        {
-                            // Passage is only 1 tile wide, widen it
-                            if (_map[x, y - 2] == 1)
-                            {
-                                _map[x, y - 1] = 0;
-                                changed = true;
-                            }
-                            if (_map[x, y + 2] == 1)
-                            {
-                                _map[x, y + 1] = 0;
-                                changed = true;
-                            }
-                        }
+                        // Check passage width in all directions and widen if needed
+                        changed |= WidenIfNarrow(x, y, 0, 1, minPassageWidth);  // Vertical
+                        changed |= WidenIfNarrow(x, y, 1, 0, minPassageWidth);  // Horizontal
+                        changed |= WidenIfNarrow(x, y, 1, 1, minPassageWidth);  // Diagonal
+                        changed |= WidenIfNarrow(x, y, 1, -1, minPassageWidth); // Anti-diagonal
+                    }
+                }
+            }
 
-                        // Check if this is a narrow vertical passage
-                        if (_map[x - 1, y] == 1 && _map[x + 1, y] == 1)
+            if (!changed) break;
+        }
+
+        // Final pass: ensure no single-tile bottlenecks exist
+        for (int x = 3; x < MapWidth - 3; x++)
+        {
+            for (int y = 3; y < MapHeight - 3; y++)
+            {
+                if (_map[x, y] == 0)
+                {
+                    // Count adjacent floor tiles
+                    int floorCount = 0;
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        for (int dy = -1; dy <= 1; dy++)
                         {
-                            // Passage is only 1 tile wide, widen it
-                            if (_map[x - 2, y] == 1)
+                            if (dx == 0 && dy == 0) continue;
+                            if (_map[x + dx, y + dy] == 0) floorCount++;
+                        }
+                    }
+
+                    // If this is a chokepoint (only 2 adjacent floors in opposite directions)
+                    // widen the area around it
+                    if (floorCount <= 2)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            for (int dy = -1; dy <= 1; dy++)
                             {
-                                _map[x - 1, y] = 0;
-                                changed = true;
-                            }
-                            if (_map[x + 2, y] == 1)
-                            {
-                                _map[x + 1, y] = 0;
-                                changed = true;
+                                int nx = x + dx;
+                                int ny = y + dy;
+                                if (nx > 2 && nx < MapWidth - 2 && ny > 2 && ny < MapHeight - 2)
+                                {
+                                    _map[nx, ny] = 0;
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    private bool WidenIfNarrow(int x, int y, int dx, int dy, int minWidth)
+    {
+        // Count width perpendicular to the direction (dx, dy)
+        int perpDx = -dy;
+        int perpDy = dx;
+
+        int widthPositive = 0;
+        int widthNegative = 0;
+
+        // Count floor tiles in positive perpendicular direction
+        for (int i = 1; i <= minWidth; i++)
+        {
+            int checkX = x + perpDx * i;
+            int checkY = y + perpDy * i;
+            if (checkX >= 0 && checkX < MapWidth && checkY >= 0 && checkY < MapHeight && _map[checkX, checkY] == 0)
+                widthPositive++;
+            else
+                break;
+        }
+
+        // Count floor tiles in negative perpendicular direction
+        for (int i = 1; i <= minWidth; i++)
+        {
+            int checkX = x - perpDx * i;
+            int checkY = y - perpDy * i;
+            if (checkX >= 0 && checkX < MapWidth && checkY >= 0 && checkY < MapHeight && _map[checkX, checkY] == 0)
+                widthNegative++;
+            else
+                break;
+        }
+
+        int totalWidth = 1 + widthPositive + widthNegative;
+
+        // If passage is too narrow, widen it
+        if (totalWidth < minWidth)
+        {
+            bool changed = false;
+            int needed = minWidth - totalWidth;
+
+            for (int i = 1; i <= needed + 1; i++)
+            {
+                // Try to widen in positive direction
+                int nx1 = x + perpDx * (widthPositive + i);
+                int ny1 = y + perpDy * (widthPositive + i);
+                if (nx1 > 2 && nx1 < MapWidth - 2 && ny1 > 2 && ny1 < MapHeight - 2)
+                {
+                    if (_map[nx1, ny1] == 1)
+                    {
+                        _map[nx1, ny1] = 0;
+                        changed = true;
+                    }
+                }
+
+                // Try to widen in negative direction
+                int nx2 = x - perpDx * (widthNegative + i);
+                int ny2 = y - perpDy * (widthNegative + i);
+                if (nx2 > 2 && nx2 < MapWidth - 2 && ny2 > 2 && ny2 < MapHeight - 2)
+                {
+                    if (_map[nx2, ny2] == 1)
+                    {
+                        _map[nx2, ny2] = 0;
+                        changed = true;
+                    }
+                }
+            }
+            return changed;
+        }
+
+        return false;
     }
 
     private void EnsureConnectivity()
@@ -545,8 +628,8 @@ public partial class DungeonFloor : Node2D
             }
         }
 
-        // Carve a passage between them (radius 3 for wider passages)
-        CreatePassage(bestA, bestB, 3);
+        // Carve a passage between them (radius 4 for wider passages)
+        CreatePassage(bestA, bestB, 4);
     }
 
     private void CreatePassage(Vector2I from, Vector2I to, int radius)
