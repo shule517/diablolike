@@ -17,6 +17,9 @@ public partial class Item : Area2D
     private ColorRect? _visual;
     private bool _isPickedUp = false;
 
+    private float _baseY;
+    private bool _animationStarted = false;
+
     public override void _Ready()
     {
         BodyEntered += OnBodyEntered;
@@ -24,11 +27,21 @@ public partial class Item : Area2D
         _visual = GetNodeOrNull<ColorRect>("Visual");
         UpdateVisual();
 
-        // Add floating animation
+        // Delay animation start to ensure position is set correctly
+        CallDeferred(nameof(StartFloatingAnimation));
+    }
+
+    private void StartFloatingAnimation()
+    {
+        if (_animationStarted) return;
+        _animationStarted = true;
+
+        _baseY = GlobalPosition.Y;
+
         var tween = CreateTween();
         tween.SetLoops();
-        tween.TweenProperty(this, "position:y", Position.Y - 5, 0.5f);
-        tween.TweenProperty(this, "position:y", Position.Y + 5, 0.5f);
+        tween.TweenProperty(this, "global_position:y", _baseY - 5, 0.5f);
+        tween.TweenProperty(this, "global_position:y", _baseY + 5, 0.5f);
     }
 
     private void UpdateVisual()

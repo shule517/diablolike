@@ -5,7 +5,8 @@
 [node name="DungeonFloor1" type="Node2D"]
 script = ExtResource("1_dungeonfloor")
 FloorNumber = 1
-RoomCount = 5
-RoomWidth = 500
-RoomHeight = 350
-CorridorLength = 120
+RoomCount = 12
+BaseRoomWidth = 450
+BaseRoomHeight = 360
+GridSpacingX = 650
+GridSpacingY = 550

@@ -282,13 +282,22 @@ public partial class Enemy : CharacterBody2D
             if (itemScene != null)
             {
                 var item = itemScene.Instantiate<Item>();
-                item.GlobalPosition = GlobalPosition;
+
+                // Store the world position before adding to tree
+                Vector2 spawnPosition = GlobalPosition;
 
                 // Random item type
                 int itemType = random.RandiRange(0, 2);
                 item.ItemType = (Item.Type)itemType;
 
-                GetParent().CallDeferred("add_child", item);
+                // Add to root level (DungeonFloor) to avoid coordinate issues
+                var dungeonFloor = GetTree().GetFirstNodeInGroup("dungeon_floor") ?? GetTree().CurrentScene;
+                if (dungeonFloor != null)
+                {
+                    dungeonFloor.CallDeferred("add_child", item);
+                    // Set position after adding to tree via deferred call
+                    item.SetDeferred("global_position", spawnPosition);
+                }
             }
         }
 
