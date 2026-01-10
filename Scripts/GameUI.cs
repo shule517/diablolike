@@ -9,6 +9,7 @@ public partial class GameUI : CanvasLayer
     private Label? _levelLabel;
     private Label? _healthLabel;
     private Label? _manaLabel;
+    private Label? _floorLabel;
     private Panel? _gameOverPanel;
     private Panel? _levelUpPanel;
 
@@ -26,6 +27,7 @@ public partial class GameUI : CanvasLayer
         _levelLabel = GetNodeOrNull<Label>("LevelLabel");
         _healthLabel = GetNodeOrNull<Label>("HealthBar/Label");
         _manaLabel = GetNodeOrNull<Label>("ManaBar/Label");
+        _floorLabel = GetNodeOrNull<Label>("FloorLabel");
         _gameOverPanel = GetNodeOrNull<Panel>("GameOverPanel");
         _levelUpPanel = GetNodeOrNull<Panel>("LevelUpPanel");
 
@@ -60,6 +62,9 @@ public partial class GameUI : CanvasLayer
             OnManaChanged(_player.CurrentMana, _player.MaxMana);
             UpdateLevelLabel();
         }
+
+        // Update floor label
+        UpdateFloorLabel();
     }
 
     private void OnHealthChanged(int current, int max)
@@ -145,6 +150,15 @@ public partial class GameUI : CanvasLayer
         if (_levelLabel != null && _player != null)
         {
             _levelLabel.Text = $"Lv. {_player.Level}";
+        }
+    }
+
+    private void UpdateFloorLabel()
+    {
+        if (_floorLabel != null)
+        {
+            int floor = GameManager.Instance?.CurrentFloorNumber ?? 1;
+            _floorLabel.Text = $"Floor B{floor}";
         }
     }
 

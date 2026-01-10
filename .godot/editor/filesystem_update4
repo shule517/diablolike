@@ -4,3 +4,6 @@ res://Scripts/Enemy.cs
 res://Scripts/GameManager.cs
 res://Scripts/GameUI.cs
 res://Scripts/Item.cs
+res://Scripts/Room.cs
+res://Scripts/Door.cs
+res://Scripts/DungeonFloor.cs

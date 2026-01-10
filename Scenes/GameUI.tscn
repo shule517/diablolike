@@ -117,6 +117,13 @@ offset_right = 100.0
 offset_bottom = 105.0
 text = "Lv. 1"
 
+[node name="FloorLabel" type="Label" parent="."]
+offset_left = 20.0
+offset_top = 105.0
+offset_right = 120.0
+offset_bottom = 130.0
+text = "Floor B1"
+
 [node name="Controls" type="Label" parent="."]
 anchors_preset = 1
 anchor_left = 1.0
@@ -124,12 +131,11 @@ anchor_right = 1.0
 offset_left = -200.0
 offset_top = 20.0
 offset_right = -20.0
-offset_bottom = 100.0
+offset_bottom = 120.0
 grow_horizontal = 0
 text = "WASD - Move
-Left Click - Attack
-Right Click - Skill
-I - Inventory"
+Left Click - Attack/Open Door
+Right Click - Skill"
 horizontal_alignment = 2
 
 [node name="GameOverPanel" type="Panel" parent="."]
