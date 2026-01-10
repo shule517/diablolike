@@ -17,6 +17,8 @@ public partial class GameUI : CanvasLayer
 	private Panel? _gameOverPanel;
 	private Panel? _levelUpPanel;
 	private Panel? _statPanel;
+	private Button? _restartButton;
+	private Button? _quitButton;
 
 	private ColorRect? _healthFill;
 	private ColorRect? _manaFill;
@@ -34,6 +36,9 @@ public partial class GameUI : CanvasLayer
 
 	public override void _Ready()
 	{
+		// Allow UI to work even when game is paused
+		ProcessMode = ProcessModeEnum.Always;
+
 		_healthBar = GetNodeOrNull<ProgressBar>("HealthBar");
 		_manaBar = GetNodeOrNull<ProgressBar>("ManaBar");
 		_expBar = GetNodeOrNull<ProgressBar>("ExpBar");
@@ -49,7 +54,22 @@ public partial class GameUI : CanvasLayer
 		_expFill = GetNodeOrNull<ColorRect>("ExpBar/Fill");
 
 		if (_gameOverPanel != null)
+		{
 			_gameOverPanel.Visible = false;
+			// Ensure game over panel works when paused
+			_gameOverPanel.ProcessMode = ProcessModeEnum.Always;
+
+			// Get button references
+			_restartButton = _gameOverPanel.GetNodeOrNull<Button>("VBoxContainer/RestartButton");
+			_quitButton = _gameOverPanel.GetNodeOrNull<Button>("VBoxContainer/QuitButton");
+
+			// Set up focus neighbors for controller navigation
+			if (_restartButton != null && _quitButton != null)
+			{
+				_restartButton.FocusNeighborBottom = _quitButton.GetPath();
+				_quitButton.FocusNeighborTop = _restartButton.GetPath();
+			}
+		}
 
 		if (_levelUpPanel != null)
 			_levelUpPanel.Visible = false;
@@ -324,16 +344,79 @@ public partial class GameUI : CanvasLayer
 		if (_gameOverPanel != null)
 		{
 			_gameOverPanel.Visible = true;
+			// Pause the game so buttons can be clicked
+			GetTree().Paused = true;
+
+			// Set focus to restart button for controller support
+			if (_restartButton != null)
+			{
+				_restartButton.GrabFocus();
+			}
 		}
 	}
 
 	public void OnRestartButtonPressed()
 	{
-		GetTree().ReloadCurrentScene();
+		// Unpause the game
+		GetTree().Paused = false;
+
+		// Hide game over panel
+		if (_gameOverPanel != null)
+		{
+			_gameOverPanel.Visible = false;
+		}
+
+		// Revive player and return to town
+		if (_player != null)
+		{
+			_player.Revive();
+		}
+
+		GameManager.Instance?.ReturnToTown();
 	}
 
 	public void OnQuitButtonPressed()
 	{
+		GetTree().Paused = false;
 		GetTree().Quit();
+	}
+
+	public override void _Input(InputEvent @event)
+	{
+		// Handle controller input for game over screen
+		if (_gameOverPanel != null && _gameOverPanel.Visible)
+		{
+			// Navigate with D-pad or stick
+			if (@event.IsActionPressed("move_down") || @event.IsActionPressed("ui_down"))
+			{
+				if (_restartButton != null && _restartButton.HasFocus())
+				{
+					_quitButton?.GrabFocus();
+					GetViewport().SetInputAsHandled();
+				}
+			}
+			else if (@event.IsActionPressed("move_up") || @event.IsActionPressed("ui_up"))
+			{
+				if (_quitButton != null && _quitButton.HasFocus())
+				{
+					_restartButton?.GrabFocus();
+					GetViewport().SetInputAsHandled();
+				}
+			}
+			// Confirm with A button or Enter
+			else if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("attack"))
+			{
+				if (_restartButton != null && _restartButton.HasFocus())
+				{
+					OnRestartButtonPressed();
+					GetViewport().SetInputAsHandled();
+				}
+				else if (_quitButton != null && _quitButton.HasFocus())
+				{
+					OnQuitButtonPressed();
+					GetViewport().SetInputAsHandled();
+				}
+			}
+		}
 	}
 }

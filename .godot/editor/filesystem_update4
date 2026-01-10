@@ -8,3 +8,4 @@ res://Scripts/Room.cs
 res://Scripts/Door.cs
 res://Scripts/DungeonFloor.cs
 res://Scripts/Minimap.cs
+res://Scripts/Town.cs

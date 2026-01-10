@@ -27,8 +27,13 @@ public partial class Minimap : Control
 	private Color _playerColor = new Color(0.3f, 1.0f, 0.3f, 1.0f);
 	private Color _enemyColor = new Color(1.0f, 0.3f, 0.3f, 1.0f);
 
+	private bool _isInitialized = false;
+
 	public override void _Ready()
 	{
+		// Start hidden (will show when entering dungeon)
+		Visible = false;
+
 		// Get viewport size for full-screen overlay
 		var viewportSize = GetViewport().GetVisibleRect().Size;
 
@@ -43,15 +48,55 @@ public partial class Minimap : Control
 		_minimapDisplay.StretchMode = TextureRect.StretchModeEnum.KeepCentered;
 		AddChild(_minimapDisplay);
 
-		// Wait for scene to be ready
-		CallDeferred(nameof(InitializeMinimap));
+		// Find player
+		_player = GetTree().GetFirstNodeInGroup("player") as Player;
+
+		// Connect to GameManager location change signal
+		CallDeferred(nameof(ConnectToGameManager));
+	}
+
+	private void ConnectToGameManager()
+	{
+		if (GameManager.Instance != null)
+		{
+			GameManager.Instance.LocationChanged += OnLocationChanged;
+			// Check initial state
+			OnLocationChanged(GameManager.Instance.IsInTown);
+		}
+	}
+
+	private void OnLocationChanged(bool isInTown)
+	{
+		if (isInTown)
+		{
+			// Hide minimap in town
+			Visible = false;
+			_isInitialized = false;
+			_dungeonFloor = null;
+			_explored = null;
+		}
+		else
+		{
+			// Show and initialize minimap in dungeon after a short delay
+			// to ensure DungeonFloor is fully ready
+			GetTree().CreateTimer(0.1).Timeout += () =>
+			{
+				Visible = true;
+				InitializeMinimap();
+			};
+		}
 	}
 
 	private void InitializeMinimap()
 	{
-		// Find player and dungeon floor
-		_player = GetTree().GetFirstNodeInGroup("player") as Player;
+		// Find dungeon floor
 		_dungeonFloor = GetTree().GetFirstNodeInGroup("dungeon_floor") as DungeonFloor;
+
+		if (_dungeonFloor == null)
+		{
+			// Try to find it directly
+			_dungeonFloor = GameManager.Instance?.CurrentFloor;
+		}
 
 		if (_dungeonFloor == null)
 		{
@@ -66,6 +111,7 @@ public partial class Minimap : Control
 
 		// Initialize explored array
 		_explored = new bool[_mapWidth, _mapHeight];
+		_lastPlayerTile = new Vector2I(-1, -1);
 
 		// Create map image - size based on view radius (player-centered view)
 		int imageSize = ViewRadius * 2 * TileSize;
@@ -74,11 +120,13 @@ public partial class Minimap : Control
 
 		_mapTexture = ImageTexture.CreateFromImage(_mapImage);
 		_minimapDisplay!.Texture = _mapTexture;
+
+		_isInitialized = true;
 	}
 
 	public override void _Process(double delta)
 	{
-		if (_player == null || _dungeonFloor == null || _explored == null || _mapImage == null)
+		if (!_isInitialized || _player == null || _dungeonFloor == null || _explored == null || _mapImage == null)
 			return;
 
 		_updateTimer += (float)delta;

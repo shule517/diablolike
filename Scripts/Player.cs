@@ -85,6 +85,8 @@ public partial class Player : CharacterBody2D
 
 	public override void _PhysicsProcess(double delta)
 	{
+		if (_isDead) return;
+
 		if (_attackTimer > 0)
 		{
 			_attackTimer -= (float)delta;
@@ -154,6 +156,8 @@ public partial class Player : CharacterBody2D
 
 	public override void _Input(InputEvent @event)
 	{
+		if (_isDead) return;
+
 		// Detect input type
 		if (@event is InputEventMouseMotion || @event is InputEventMouseButton)
 		{
@@ -442,10 +446,23 @@ public partial class Player : CharacterBody2D
 		return Level * 100;
 	}
 
+	private bool _isDead = false;
+
 	private void Die()
 	{
+		if (_isDead) return;
+		_isDead = true;
 		EmitSignal(SignalName.PlayerDied);
 		PlayAnimation("death");
+	}
+
+	public void Revive()
+	{
+		_isDead = false;
+		CurrentHealth = MaxHealth;
+		CurrentMana = MaxMana;
+		EmitSignal(SignalName.HealthChanged, CurrentHealth, MaxHealth);
+		EmitSignal(SignalName.ManaChanged, CurrentMana, MaxMana);
 	}
 
 	private void PlayAnimation(string animationName)

@@ -171,11 +171,13 @@ horizontal_alignment = 1
 
 [node name="RestartButton" type="Button" parent="GameOverPanel/VBoxContainer"]
 layout_mode = 2
-text = "Restart"
+focus_mode = 2
+text = "町に戻る"
 
 [node name="QuitButton" type="Button" parent="GameOverPanel/VBoxContainer"]
 layout_mode = 2
-text = "Quit"
+focus_mode = 2
+text = "終了"
 
 [node name="LevelUpPanel" type="Panel" parent="."]
 visible = false

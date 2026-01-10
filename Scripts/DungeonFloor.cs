@@ -50,6 +50,7 @@ public partial class DungeonFloor : Node2D
         CreateVisuals();
         SpawnEnemies();
         CreateNavigationRegion();
+        CreateTownPortal();
     }
 
     private void GenerateAntNest()
@@ -552,6 +553,95 @@ public partial class DungeonFloor : Node2D
 
         navRegion.NavigationPolygon = navPoly;
         AddChild(navRegion);
+    }
+
+    private void CreateTownPortal()
+    {
+        Vector2 portalPos = GetPlayerStartPosition();
+
+        var portal = new Area2D();
+        portal.Name = "TownPortal";
+        portal.Position = portalPos;
+        portal.AddToGroup("town_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 20;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - blue portal
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(40, 40);
+        portalBg.Position = new Vector2(-20, -20);
+        portalBg.Color = new Color(0.2f, 0.3f, 0.8f, 0.8f);
+        portal.AddChild(portalBg);
+
+        // Portal frame
+        var frame = new ColorRect();
+        frame.Size = new Vector2(48, 48);
+        frame.Position = new Vector2(-24, -24);
+        frame.Color = new Color(0.4f, 0.5f, 0.9f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        // Label
+        var label = new Label();
+        label.Text = "Town";
+        label.Position = new Vector2(-16, 24);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        // Glow effect
+        var light = new PointLight2D();
+        light.Color = new Color(0.3f, 0.4f, 1.0f);
+        light.Energy = 1.0f;
+        light.TextureScale = 0.5f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        // Disable monitoring initially to prevent immediate trigger
+        portal.Monitoring = false;
+
+        // Connect signal
+        portal.BodyEntered += OnTownPortalEntered;
+
+        AddChild(portal);
+
+        // Enable portal after delay so player doesn't trigger it immediately
+        GetTree().CreateTimer(1.0).Timeout += () =>
+        {
+            if (IsInstanceValid(portal))
+            {
+                portal.Monitoring = true;
+            }
+        };
+    }
+
+    private void OnTownPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            // Deferred to avoid physics callback issues
+            CallDeferred(nameof(ReturnToTownDeferred));
+        }
+    }
+
+    private void ReturnToTownDeferred()
+    {
+        GameManager.Instance?.ReturnToTown();
     }
 
     public Vector2 GetPlayerStartPosition()

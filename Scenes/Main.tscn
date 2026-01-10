@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://c5k7m9n1p3q5s"]
 
 [ext_resource type="PackedScene" uid="uid://c7j5n8k2m3p1q" path="res://Scenes/Player.tscn" id="1_player"]
-[ext_resource type="PackedScene" uid="uid://c4k6m8n0p2q4s" path="res://Scenes/DungeonFloor1.tscn" id="2_dungeonfloor"]
+[ext_resource type="PackedScene" uid="uid://c8t6n2k4m9p1q" path="res://Scenes/Town.tscn" id="2_town"]
 [ext_resource type="PackedScene" uid="uid://c3k5m7n9p1q3s" path="res://Scenes/GameUI.tscn" id="3_gameui"]
 [ext_resource type="Script" path="res://Scripts/GameManager.cs" id="4_gamemanager"]
 
@@ -10,7 +10,7 @@
 [node name="GameManager" type="Node" parent="."]
 script = ExtResource("4_gamemanager")
 
-[node name="DungeonFloor" parent="." instance=ExtResource("2_dungeonfloor")]
+[node name="Town" parent="." instance=ExtResource("2_town")]
 
 [node name="Player" parent="." groups=["player"] instance=ExtResource("1_player")]
 position = Vector2(250, 0)
