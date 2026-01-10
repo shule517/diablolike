@@ -427,18 +427,9 @@ public partial class DungeonFloor : Node2D
             wall.AddChild(edge);
         }
 
-        // Light occluder
-        var occluder = new LightOccluder2D();
-        var occluderPoly = new OccluderPolygon2D();
-        occluderPoly.Polygon = new Vector2[]
-        {
-            new Vector2(0, 0),
-            new Vector2(TileSize, 0),
-            new Vector2(TileSize, TileSize),
-            new Vector2(0, TileSize)
-        };
-        occluder.Occluder = occluderPoly;
-        wall.AddChild(occluder);
+        // Light occluder disabled - shadows removed
+        // var occluder = new LightOccluder2D();
+        // ...
 
         _wallContainer.AddChild(wall);
     }
