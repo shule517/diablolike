@@ -5,386 +5,497 @@ using System.Collections.Generic;
 public partial class DungeonFloor : Node2D
 {
     [Export] public int FloorNumber = 1;
-    [Export] public int RoomCount = 12;
-    [Export] public int BaseRoomWidth = 400;
-    [Export] public int BaseRoomHeight = 320;
-    [Export] public int GridSpacingX = 600;
-    [Export] public int GridSpacingY = 500;
+    [Export] public int MapWidth = 80;
+    [Export] public int MapHeight = 60;
+    [Export] public int TileSize = 16;
+    [Export] public float InitialFillPercent = 0.42f;
+    [Export] public int SmoothIterations = 4;
+    [Export] public int MinPassageWidth = 3;
 
+    private int[,] _map = new int[0, 0]; // 0 = floor, 1 = wall
     private List<Room> _rooms = new();
     private List<Door> _doors = new();
-    private Dictionary<Vector2I, Room> _roomGrid = new();
+    private List<HashSet<Vector2I>> _regions = new();
     private PackedScene? _doorScene;
     private RandomNumberGenerator _rng = new();
 
-    // Colors matching Room.cs
+    // Colors
     private Color _floorColor = new Color(0.15f, 0.13f, 0.11f);
+    private Color _floorTileColor = new Color(0.18f, 0.15f, 0.12f);
     private Color _wallColor = new Color(0.22f, 0.18f, 0.14f);
     private Color _wallDarkColor = new Color(0.12f, 0.1f, 0.08f);
+
+    private Node2D? _floorContainer;
+    private Node2D? _wallContainer;
+    private Node2D? _decorContainer;
+    private Dictionary<int, Node2D> _regionFogOverlays = new();
+    private Dictionary<int, bool> _regionRevealed = new();
 
     public override void _Ready()
     {
         _rng.Randomize();
         _doorScene = GD.Load<PackedScene>("res://Scenes/Door.tscn");
-
         AddToGroup("dungeon_floor");
 
-        GenerateFloor();
+        _floorContainer = new Node2D { Name = "FloorContainer" };
+        _wallContainer = new Node2D { Name = "WallContainer" };
+        _decorContainer = new Node2D { Name = "DecorContainer" };
+
+        AddChild(_floorContainer);
+        AddChild(_wallContainer);
+        AddChild(_decorContainer);
+
+        GenerateMap();
+        CreateVisuals();
+        CreateRegionsAndDoors();
         CreateNavigationRegion();
     }
 
-    private void GenerateFloor()
+    private void GenerateMap()
     {
-        // Generate a 2D layout using a random walk / branching algorithm
-        List<Vector2I> roomPositions = GenerateRoomLayout();
+        _map = new int[MapWidth, MapHeight];
 
-        Room.RoomShape[] shapes = {
-            Room.RoomShape.Rectangle,
-            Room.RoomShape.LShape,
-            Room.RoomShape.TShape,
-            Room.RoomShape.Irregular,
-            Room.RoomShape.Cross,
-            Room.RoomShape.Rectangle,
-            Room.RoomShape.LShape,
-            Room.RoomShape.Rectangle
-        };
-
-        // Create rooms at each position
-        for (int i = 0; i < roomPositions.Count; i++)
+        // Initialize with random noise
+        for (int x = 0; x < MapWidth; x++)
         {
-            Vector2I gridPos = roomPositions[i];
-            Vector2 worldPos = new Vector2(gridPos.X * GridSpacingX, gridPos.Y * GridSpacingY);
-
-            int width = BaseRoomWidth + _rng.RandiRange(-60, 100);
-            int height = BaseRoomHeight + _rng.RandiRange(-40, 80);
-
-            var room = new Room();
-            room.Width = width;
-            room.Height = height;
-            room.IsStartRoom = (i == 0);
-            room.Shape = shapes[i % shapes.Length];
-            room.MinEnemies = 4 + (i / 3) * 2;
-            room.MaxEnemies = 8 + (i / 3) * 3;
-            room.Position = worldPos;
-            room.Name = $"Room_{i + 1}_({gridPos.X},{gridPos.Y})";
-
-            AddChild(room);
-            _rooms.Add(room);
-            _roomGrid[gridPos] = room;
-        }
-
-        // Create corridors and doors between adjacent rooms
-        CreateConnections(roomPositions);
-    }
-
-    private List<Vector2I> GenerateRoomLayout()
-    {
-        List<Vector2I> positions = new();
-        HashSet<Vector2I> occupied = new();
-
-        // Start at origin
-        Vector2I current = Vector2I.Zero;
-        positions.Add(current);
-        occupied.Add(current);
-
-        // Directions: right, down, left, up
-        Vector2I[] directions = {
-            new Vector2I(1, 0),   // right
-            new Vector2I(0, 1),   // down
-            new Vector2I(-1, 0),  // left
-            new Vector2I(0, -1)   // up
-        };
-
-        // Main path - mostly goes right and down
-        Vector2I mainDir = new Vector2I(1, 0);
-        int mainPathLength = RoomCount / 2;
-
-        for (int i = 0; i < mainPathLength && positions.Count < RoomCount; i++)
-        {
-            // Prefer going right, sometimes go down or up
-            float rand = _rng.Randf();
-            Vector2I nextDir;
-
-            if (rand < 0.5f)
-                nextDir = new Vector2I(1, 0); // right
-            else if (rand < 0.75f)
-                nextDir = new Vector2I(0, 1); // down
-            else
-                nextDir = new Vector2I(0, -1); // up
-
-            Vector2I next = current + nextDir;
-
-            // Try to find unoccupied position
-            int attempts = 0;
-            while (occupied.Contains(next) && attempts < 4)
+            for (int y = 0; y < MapHeight; y++)
             {
-                nextDir = directions[_rng.RandiRange(0, 3)];
-                next = current + nextDir;
-                attempts++;
-            }
-
-            if (!occupied.Contains(next))
-            {
-                positions.Add(next);
-                occupied.Add(next);
-                current = next;
-            }
-        }
-
-        // Add branches from existing rooms
-        List<Vector2I> branchPoints = new List<Vector2I>(positions);
-
-        while (positions.Count < RoomCount)
-        {
-            // Pick a random existing room to branch from
-            Vector2I branchFrom = branchPoints[_rng.RandiRange(0, branchPoints.Count - 1)];
-
-            // Try each direction
-            bool added = false;
-            foreach (var dir in directions)
-            {
-                Vector2I next = branchFrom + dir;
-                if (!occupied.Contains(next))
+                // Edges are always walls
+                if (x == 0 || x == MapWidth - 1 || y == 0 || y == MapHeight - 1)
                 {
-                    positions.Add(next);
-                    occupied.Add(next);
-                    branchPoints.Add(next);
-                    added = true;
-                    break;
+                    _map[x, y] = 1;
+                }
+                else
+                {
+                    _map[x, y] = _rng.Randf() < InitialFillPercent ? 1 : 0;
                 }
             }
-
-            // If no direction worked, remove this branch point
-            if (!added)
-            {
-                branchPoints.Remove(branchFrom);
-                if (branchPoints.Count == 0) break;
-            }
         }
 
-        return positions;
+        // Apply cellular automata smoothing
+        for (int i = 0; i < SmoothIterations; i++)
+        {
+            SmoothMap();
+        }
+
+        // Ensure connectivity
+        EnsureConnectivity();
+
+        // Widen narrow passages so player can pass through
+        WidenNarrowPassages();
+
+        // Add some organic features
+        AddAlcovesAndVariations();
     }
 
-    private void CreateConnections(List<Vector2I> roomPositions)
+    private void WidenNarrowPassages()
     {
-        HashSet<string> createdConnections = new();
+        // Find and widen narrow passages
+        bool changed = true;
+        int iterations = 0;
+        int maxIterations = 5;
 
-        Vector2I[] directions = {
-            new Vector2I(1, 0),   // right
-            new Vector2I(0, 1),   // down
-            new Vector2I(-1, 0),  // left
-            new Vector2I(0, -1)   // up
-        };
-
-        for (int i = 0; i < roomPositions.Count; i++)
+        while (changed && iterations < maxIterations)
         {
-            Vector2I pos = roomPositions[i];
+            changed = false;
+            iterations++;
 
-            foreach (var dir in directions)
+            for (int x = 2; x < MapWidth - 2; x++)
             {
-                Vector2I neighborPos = pos + dir;
-
-                if (_roomGrid.ContainsKey(neighborPos))
+                for (int y = 2; y < MapHeight - 2; y++)
                 {
-                    // Create unique connection key
-                    string connKey = GetConnectionKey(pos, neighborPos);
-
-                    if (!createdConnections.Contains(connKey))
+                    if (_map[x, y] == 0)
                     {
-                        createdConnections.Add(connKey);
+                        // Check if this is a narrow horizontal passage
+                        if (_map[x, y - 1] == 1 && _map[x, y + 1] == 1)
+                        {
+                            // Passage is only 1 tile wide, widen it
+                            if (_map[x, y - 2] == 1)
+                            {
+                                _map[x, y - 1] = 0;
+                                changed = true;
+                            }
+                            if (_map[x, y + 2] == 1)
+                            {
+                                _map[x, y + 1] = 0;
+                                changed = true;
+                            }
+                        }
 
-                        Room roomA = _roomGrid[pos];
-                        Room roomB = _roomGrid[neighborPos];
-
-                        // Create corridor between rooms
-                        CreateCorridor(roomA, roomB, dir, i);
+                        // Check if this is a narrow vertical passage
+                        if (_map[x - 1, y] == 1 && _map[x + 1, y] == 1)
+                        {
+                            // Passage is only 1 tile wide, widen it
+                            if (_map[x - 2, y] == 1)
+                            {
+                                _map[x - 1, y] = 0;
+                                changed = true;
+                            }
+                            if (_map[x + 2, y] == 1)
+                            {
+                                _map[x + 1, y] = 0;
+                                changed = true;
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private string GetConnectionKey(Vector2I a, Vector2I b)
+    private void SmoothMap()
     {
-        // Ensure consistent ordering
-        if (a.X < b.X || (a.X == b.X && a.Y < b.Y))
-            return $"{a.X},{a.Y}-{b.X},{b.Y}";
-        else
-            return $"{b.X},{b.Y}-{a.X},{a.Y}";
-    }
+        int[,] newMap = new int[MapWidth, MapHeight];
 
-    private void CreateCorridor(Room roomA, Room roomB, Vector2I direction, int index)
-    {
-        Vector2 startPos = roomA.Position;
-        Vector2 endPos = roomB.Position;
-
-        bool isHorizontal = direction.X != 0;
-
-        Vector2 corridorStart, corridorEnd;
-
-        if (isHorizontal)
+        for (int x = 0; x < MapWidth; x++)
         {
-            // Horizontal corridor
-            float yOffset = _rng.RandfRange(-30, 30);
-            corridorStart = startPos + new Vector2(roomA.Width / 2, yOffset);
-            corridorEnd = endPos + new Vector2(-roomB.Width / 2, yOffset);
-
-            roomA.CreateDoorOpening(new Vector2(roomA.Width / 2, yOffset), false);
-            roomB.CreateDoorOpening(new Vector2(-roomB.Width / 2, yOffset), false);
-        }
-        else
-        {
-            // Vertical corridor
-            float xOffset = _rng.RandfRange(-30, 30);
-            corridorStart = startPos + new Vector2(xOffset, direction.Y > 0 ? roomA.Height / 2 : -roomA.Height / 2);
-            corridorEnd = endPos + new Vector2(xOffset, direction.Y > 0 ? -roomB.Height / 2 : roomB.Height / 2);
-
-            roomA.CreateDoorOpening(new Vector2(xOffset, direction.Y > 0 ? roomA.Height / 2 : -roomA.Height / 2), true);
-            roomB.CreateDoorOpening(new Vector2(xOffset, direction.Y > 0 ? -roomB.Height / 2 : roomB.Height / 2), true);
-        }
-
-        // Create the corridor segments
-        CreateWindingCorridor(corridorStart, corridorEnd, index, isHorizontal);
-
-        // Create door in the middle
-        Vector2 doorPos = (corridorStart + corridorEnd) / 2;
-        int roomBIndex = _rooms.IndexOf(roomB);
-        CreateDoor(doorPos, roomBIndex, !isHorizontal);
-    }
-
-    private void CreateWindingCorridor(Vector2 start, Vector2 end, int index, bool isHorizontal)
-    {
-        var corridor = new Node2D();
-        corridor.Name = $"Corridor_{index}";
-
-        Vector2 direction = (end - start).Normalized();
-        float length = start.DistanceTo(end);
-
-        if (length < 10) return;
-
-        // Create corridor with bends
-        int segments = _rng.RandiRange(2, 3);
-        List<Vector2> points = new List<Vector2> { start };
-
-        for (int i = 1; i < segments; i++)
-        {
-            float progress = (float)i / segments;
-            float bendAmount = _rng.RandfRange(-30, 30);
-            Vector2 perpendicular = new Vector2(-direction.Y, direction.X);
-
-            Vector2 point = start + direction * (length * progress) + perpendicular * bendAmount;
-            points.Add(point);
-        }
-        points.Add(end);
-
-        // Draw corridor segments
-        for (int i = 0; i < points.Count - 1; i++)
-        {
-            CreateCorridorSegment(corridor, points[i], points[i + 1]);
-        }
-
-        AddChild(corridor);
-    }
-
-    private void CreateCorridorSegment(Node2D parent, Vector2 from, Vector2 to)
-    {
-        Vector2 direction = (to - from).Normalized();
-        float length = from.DistanceTo(to);
-
-        if (length < 5) return;
-
-        float angle = direction.Angle();
-        int corridorWidth = 70;
-
-        var floorNode = new Node2D();
-        floorNode.Position = from;
-        floorNode.Rotation = angle;
-
-        // Floor
-        var floorRect = new ColorRect();
-        floorRect.Size = new Vector2(length + 30, corridorWidth);
-        floorRect.Position = new Vector2(-15, -corridorWidth / 2);
-        floorRect.Color = _floorColor;
-        floorRect.ZIndex = -10;
-        floorNode.AddChild(floorRect);
-
-        // Floor tiles
-        for (float x = 0; x < length; x += 32)
-        {
-            if (_rng.Randf() < 0.25f)
+            for (int y = 0; y < MapHeight; y++)
             {
-                var tile = new ColorRect();
-                tile.Size = new Vector2(28, 28);
-                tile.Position = new Vector2(x, _rng.RandiRange(-12, 12));
-                tile.Color = new Color(0.18f, 0.15f, 0.12f);
-                tile.ZIndex = -9;
-                floorNode.AddChild(tile);
+                int neighborWalls = CountNeighborWalls(x, y);
+
+                if (neighborWalls > 4)
+                    newMap[x, y] = 1;
+                else if (neighborWalls < 4)
+                    newMap[x, y] = 0;
+                else
+                    newMap[x, y] = _map[x, y];
             }
         }
 
-        // Walls
-        CreateCorridorWall(floorNode, new Vector2(-15, -corridorWidth / 2), new Vector2(length + 30, 14));
-        CreateCorridorWall(floorNode, new Vector2(-15, corridorWidth / 2 - 14), new Vector2(length + 30, 14));
-
-        // Torch
-        if (length > 60 && _rng.Randf() < 0.5f)
-        {
-            float torchX = _rng.RandfRange(length * 0.3f, length * 0.7f);
-            bool topSide = _rng.Randf() < 0.5f;
-            CreateCorridorTorch(floorNode, new Vector2(torchX, topSide ? -corridorWidth / 2 + 18 : corridorWidth / 2 - 18));
-        }
-
-        parent.AddChild(floorNode);
+        _map = newMap;
     }
 
-    private void CreateCorridorWall(Node2D parent, Vector2 position, Vector2 size)
+    private int CountNeighborWalls(int x, int y)
     {
+        int count = 0;
+        for (int nx = x - 1; nx <= x + 1; nx++)
+        {
+            for (int ny = y - 1; ny <= y + 1; ny++)
+            {
+                if (nx == x && ny == y) continue;
+
+                if (nx < 0 || nx >= MapWidth || ny < 0 || ny >= MapHeight)
+                    count++;
+                else if (_map[nx, ny] == 1)
+                    count++;
+            }
+        }
+        return count;
+    }
+
+    private void EnsureConnectivity()
+    {
+        // Find all floor regions
+        List<HashSet<Vector2I>> floorRegions = GetRegions(0);
+
+        if (floorRegions.Count <= 1) return;
+
+        // Sort by size, keep largest
+        floorRegions.Sort((a, b) => b.Count.CompareTo(a.Count));
+
+        // Connect smaller regions to the main region
+        HashSet<Vector2I> mainRegion = floorRegions[0];
+
+        for (int i = 1; i < floorRegions.Count; i++)
+        {
+            if (floorRegions[i].Count < 20)
+            {
+                // Fill small regions with walls
+                foreach (var tile in floorRegions[i])
+                {
+                    _map[tile.X, tile.Y] = 1;
+                }
+            }
+            else
+            {
+                // Connect to main region
+                ConnectRegions(mainRegion, floorRegions[i]);
+                mainRegion.UnionWith(floorRegions[i]);
+            }
+        }
+    }
+
+    private List<HashSet<Vector2I>> GetRegions(int tileType)
+    {
+        List<HashSet<Vector2I>> regions = new();
+        bool[,] visited = new bool[MapWidth, MapHeight];
+
+        for (int x = 0; x < MapWidth; x++)
+        {
+            for (int y = 0; y < MapHeight; y++)
+            {
+                if (!visited[x, y] && _map[x, y] == tileType)
+                {
+                    HashSet<Vector2I> region = new();
+                    Queue<Vector2I> queue = new();
+                    queue.Enqueue(new Vector2I(x, y));
+                    visited[x, y] = true;
+
+                    while (queue.Count > 0)
+                    {
+                        Vector2I tile = queue.Dequeue();
+                        region.Add(tile);
+
+                        // Check 4-directional neighbors
+                        Vector2I[] neighbors = {
+                            new Vector2I(tile.X - 1, tile.Y),
+                            new Vector2I(tile.X + 1, tile.Y),
+                            new Vector2I(tile.X, tile.Y - 1),
+                            new Vector2I(tile.X, tile.Y + 1)
+                        };
+
+                        foreach (var neighbor in neighbors)
+                        {
+                            if (neighbor.X >= 0 && neighbor.X < MapWidth &&
+                                neighbor.Y >= 0 && neighbor.Y < MapHeight &&
+                                !visited[neighbor.X, neighbor.Y] &&
+                                _map[neighbor.X, neighbor.Y] == tileType)
+                            {
+                                visited[neighbor.X, neighbor.Y] = true;
+                                queue.Enqueue(neighbor);
+                            }
+                        }
+                    }
+
+                    regions.Add(region);
+                }
+            }
+        }
+
+        return regions;
+    }
+
+    private void ConnectRegions(HashSet<Vector2I> regionA, HashSet<Vector2I> regionB)
+    {
+        // Find closest points between regions
+        Vector2I bestA = Vector2I.Zero;
+        Vector2I bestB = Vector2I.Zero;
+        float bestDist = float.MaxValue;
+
+        foreach (var tileA in regionA)
+        {
+            foreach (var tileB in regionB)
+            {
+                float dist = (tileA - tileB).LengthSquared();
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestA = tileA;
+                    bestB = tileB;
+                }
+            }
+        }
+
+        // Carve a passage between them (radius 3 for wider passages)
+        CreatePassage(bestA, bestB, 3);
+    }
+
+    private void CreatePassage(Vector2I from, Vector2I to, int radius)
+    {
+        Vector2I current = from;
+
+        while (current != to)
+        {
+            // Carve circle at current position
+            for (int x = -radius; x <= radius; x++)
+            {
+                for (int y = -radius; y <= radius; y++)
+                {
+                    if (x * x + y * y <= radius * radius)
+                    {
+                        int nx = current.X + x;
+                        int ny = current.Y + y;
+                        if (nx > 0 && nx < MapWidth - 1 && ny > 0 && ny < MapHeight - 1)
+                        {
+                            _map[nx, ny] = 0;
+                        }
+                    }
+                }
+            }
+
+            // Move towards target
+            if (_rng.Randf() < 0.5f)
+            {
+                if (current.X != to.X)
+                    current.X += current.X < to.X ? 1 : -1;
+            }
+            else
+            {
+                if (current.Y != to.Y)
+                    current.Y += current.Y < to.Y ? 1 : -1;
+            }
+        }
+    }
+
+    private void AddAlcovesAndVariations()
+    {
+        // Add random alcoves and protrusions for organic feel
+        for (int i = 0; i < 20; i++)
+        {
+            int x = _rng.RandiRange(5, MapWidth - 6);
+            int y = _rng.RandiRange(5, MapHeight - 6);
+
+            if (_map[x, y] == 0) // If it's floor
+            {
+                // Create small alcove
+                int alcoveSize = _rng.RandiRange(2, 4);
+                float angle = _rng.Randf() * Mathf.Tau;
+
+                for (int j = 0; j < alcoveSize; j++)
+                {
+                    int ax = x + (int)(Mathf.Cos(angle) * j);
+                    int ay = y + (int)(Mathf.Sin(angle) * j);
+
+                    if (ax > 1 && ax < MapWidth - 2 && ay > 1 && ay < MapHeight - 2)
+                    {
+                        _map[ax, ay] = 0;
+                    }
+                }
+            }
+        }
+
+        // Add some pillars/obstacles
+        for (int i = 0; i < 15; i++)
+        {
+            int x = _rng.RandiRange(5, MapWidth - 6);
+            int y = _rng.RandiRange(5, MapHeight - 6);
+
+            // Only place pillar if surrounded by floor
+            if (_map[x, y] == 0 && CountNeighborWalls(x, y) == 0)
+            {
+                _map[x, y] = 1;
+            }
+        }
+    }
+
+    private void CreateVisuals()
+    {
+        if (_floorContainer == null || _wallContainer == null) return;
+
+        // Create floor tiles
+        for (int x = 0; x < MapWidth; x++)
+        {
+            for (int y = 0; y < MapHeight; y++)
+            {
+                Vector2 worldPos = new Vector2(x * TileSize, y * TileSize);
+
+                if (_map[x, y] == 0)
+                {
+                    // Floor tile
+                    var floor = new ColorRect();
+                    floor.Size = new Vector2(TileSize, TileSize);
+                    floor.Position = worldPos;
+                    floor.Color = _rng.Randf() < 0.3f ? _floorTileColor : _floorColor;
+                    floor.ZIndex = -10;
+                    _floorContainer.AddChild(floor);
+                }
+                else
+                {
+                    // Wall tile - only create visual if adjacent to floor
+                    if (HasAdjacentFloor(x, y))
+                    {
+                        CreateWallTile(worldPos, x, y);
+                    }
+                }
+            }
+        }
+
+        // Add torches
+        AddTorches();
+    }
+
+    private bool HasAdjacentFloor(int x, int y)
+    {
+        for (int nx = x - 1; nx <= x + 1; nx++)
+        {
+            for (int ny = y - 1; ny <= y + 1; ny++)
+            {
+                if (nx >= 0 && nx < MapWidth && ny >= 0 && ny < MapHeight)
+                {
+                    if (_map[nx, ny] == 0) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void CreateWallTile(Vector2 position, int x, int y)
+    {
+        if (_wallContainer == null) return;
+
         var wall = new StaticBody2D();
         wall.Position = position;
         wall.CollisionLayer = 8;
 
         var collision = new CollisionShape2D();
         var shape = new RectangleShape2D();
-        shape.Size = size;
+        shape.Size = new Vector2(TileSize, TileSize);
         collision.Shape = shape;
-        collision.Position = size / 2;
+        collision.Position = new Vector2(TileSize / 2, TileSize / 2);
         wall.AddChild(collision);
 
         var visual = new ColorRect();
-        visual.Size = size;
+        visual.Size = new Vector2(TileSize, TileSize);
         visual.Color = _wallColor;
         wall.AddChild(visual);
 
-        var edge = new ColorRect();
-        edge.Size = new Vector2(size.X, 3);
-        edge.Position = new Vector2(0, size.Y - 3);
-        edge.Color = _wallDarkColor;
-        wall.AddChild(edge);
+        // Add depth effect on bottom edge
+        if (y + 1 < MapHeight && _map[x, y + 1] == 0)
+        {
+            var edge = new ColorRect();
+            edge.Size = new Vector2(TileSize, 4);
+            edge.Position = new Vector2(0, TileSize - 4);
+            edge.Color = _wallDarkColor;
+            wall.AddChild(edge);
+        }
 
-        parent.AddChild(wall);
+        _wallContainer.AddChild(wall);
     }
 
-    private void CreateCorridorTorch(Node2D parent, Vector2 position)
+    private void AddTorches()
     {
+        if (_decorContainer == null) return;
+
+        int torchCount = 0;
+        int maxTorches = 30;
+
+        for (int x = 2; x < MapWidth - 2 && torchCount < maxTorches; x += _rng.RandiRange(6, 12))
+        {
+            for (int y = 2; y < MapHeight - 2 && torchCount < maxTorches; y += _rng.RandiRange(6, 12))
+            {
+                // Place torch on wall adjacent to floor
+                if (_map[x, y] == 1 && HasAdjacentFloor(x, y))
+                {
+                    CreateTorch(new Vector2(x * TileSize + TileSize / 2, y * TileSize + TileSize / 2));
+                    torchCount++;
+                }
+            }
+        }
+    }
+
+    private void CreateTorch(Vector2 position)
+    {
+        if (_decorContainer == null) return;
+
         var torch = new Node2D();
         torch.Position = position;
 
         var holder = new ColorRect();
-        holder.Size = new Vector2(6, 10);
-        holder.Position = new Vector2(-3, -5);
+        holder.Size = new Vector2(4, 8);
+        holder.Position = new Vector2(-2, -4);
         holder.Color = new Color(0.3f, 0.2f, 0.1f);
         torch.AddChild(holder);
 
         var flame = new ColorRect();
-        flame.Size = new Vector2(8, 8);
-        flame.Position = new Vector2(-4, -13);
+        flame.Size = new Vector2(6, 6);
+        flame.Position = new Vector2(-3, -10);
         flame.Color = new Color(1.0f, 0.7f, 0.3f);
         torch.AddChild(flame);
 
         var light = new PointLight2D();
-        light.Position = new Vector2(0, -10);
+        light.Position = new Vector2(0, -8);
         light.Color = new Color(1.0f, 0.6f, 0.2f);
-        light.Energy = 0.6f;
+        light.Energy = 0.8f;
         light.TextureScale = 0.4f;
 
         var gradientTexture = new GradientTexture2D();
@@ -398,42 +509,226 @@ public partial class DungeonFloor : Node2D
         gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
         gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
         light.Texture = gradientTexture;
-
         torch.AddChild(light);
 
+        // Animate flame
         var tween = torch.CreateTween();
         tween.SetLoops();
-        tween.TweenProperty(flame, "modulate:a", 0.6f, 0.15f);
-        tween.TweenProperty(flame, "modulate:a", 1.0f, 0.15f);
+        tween.TweenProperty(flame, "modulate:a", 0.6f, 0.15f + _rng.Randf() * 0.1f);
+        tween.TweenProperty(flame, "modulate:a", 1.0f, 0.15f + _rng.Randf() * 0.1f);
 
-        parent.AddChild(torch);
+        _decorContainer.AddChild(torch);
     }
 
-    private void CreateDoor(Vector2 position, int roomIndex, bool isVertical)
+    private void CreateRegionsAndDoors()
+    {
+        // Divide map into regions for fog of war
+        // Find chokepoints (narrow passages) to place doors
+        _regions = GetRegions(0);
+
+        if (_regions.Count == 0) return;
+
+        // For now, just reveal the starting region
+        _regionRevealed[0] = true;
+
+        // Create fog overlays for each region
+        for (int i = 0; i < _regions.Count; i++)
+        {
+            if (i == 0) continue; // Starting region is revealed
+
+            CreateFogForRegion(i, _regions[i]);
+            _regionRevealed[i] = false;
+        }
+
+        // Create doors at chokepoints
+        CreateDoorsAtChokepoints();
+
+        // Spawn enemies in hidden regions
+        SpawnEnemiesInRegions();
+    }
+
+    private void CreateFogForRegion(int regionIndex, HashSet<Vector2I> region)
+    {
+        var fogContainer = new Node2D { Name = $"Fog_{regionIndex}" };
+        fogContainer.ZIndex = 100;
+
+        // Find bounding box
+        int minX = int.MaxValue, maxX = int.MinValue;
+        int minY = int.MaxValue, maxY = int.MinValue;
+
+        foreach (var tile in region)
+        {
+            minX = Math.Min(minX, tile.X);
+            maxX = Math.Max(maxX, tile.X);
+            minY = Math.Min(minY, tile.Y);
+            maxY = Math.Max(maxY, tile.Y);
+        }
+
+        var fog = new ColorRect();
+        fog.Size = new Vector2((maxX - minX + 3) * TileSize, (maxY - minY + 3) * TileSize);
+        fog.Position = new Vector2((minX - 1) * TileSize, (minY - 1) * TileSize);
+        fog.Color = new Color(0, 0, 0, 1);
+        fogContainer.AddChild(fog);
+
+        AddChild(fogContainer);
+        _regionFogOverlays[regionIndex] = fogContainer;
+    }
+
+    private void CreateDoorsAtChokepoints()
+    {
+        if (_doorScene == null) return;
+
+        // Find narrow passages (2-3 tiles wide)
+        HashSet<Vector2I> doorPositions = new();
+
+        for (int x = 3; x < MapWidth - 3; x++)
+        {
+            for (int y = 3; y < MapHeight - 3; y++)
+            {
+                if (_map[x, y] == 0)
+                {
+                    // Check for horizontal chokepoint
+                    if (_map[x, y - 1] == 1 && _map[x, y + 1] == 1 &&
+                        _map[x - 1, y] == 0 && _map[x + 1, y] == 0)
+                    {
+                        // Verify it's a real chokepoint
+                        int width = 1;
+                        for (int dy = -1; _map[x, y + dy] == 1 && dy > -3; dy--) { }
+                        for (int dy = 1; _map[x, y + dy] == 1 && dy < 3; dy++) { }
+
+                        if (width <= 3 && !HasNearbyDoor(doorPositions, x, y))
+                        {
+                            CreateDoorAt(new Vector2(x * TileSize + TileSize / 2, y * TileSize + TileSize / 2), false);
+                            doorPositions.Add(new Vector2I(x, y));
+                        }
+                    }
+
+                    // Check for vertical chokepoint
+                    if (_map[x - 1, y] == 1 && _map[x + 1, y] == 1 &&
+                        _map[x, y - 1] == 0 && _map[x, y + 1] == 0)
+                    {
+                        if (!HasNearbyDoor(doorPositions, x, y))
+                        {
+                            CreateDoorAt(new Vector2(x * TileSize + TileSize / 2, y * TileSize + TileSize / 2), true);
+                            doorPositions.Add(new Vector2I(x, y));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private bool HasNearbyDoor(HashSet<Vector2I> doorPositions, int x, int y)
+    {
+        foreach (var pos in doorPositions)
+        {
+            if (Math.Abs(pos.X - x) + Math.Abs(pos.Y - y) < 10)
+                return true;
+        }
+        return false;
+    }
+
+    private void CreateDoorAt(Vector2 position, bool isVertical)
     {
         if (_doorScene == null) return;
 
         var door = _doorScene.Instantiate<Door>();
         door.Position = position;
-        door.Name = $"Door_to_Room_{roomIndex + 1}";
 
         if (isVertical)
         {
             door.RotationDegrees = 90;
         }
 
-        int targetRoomIndex = roomIndex;
-        door.DoorOpened += (d) => OnDoorOpened(targetRoomIndex);
+        door.DoorOpened += (d) => OnDoorOpened(d);
 
         AddChild(door);
         _doors.Add(door);
     }
 
-    private void OnDoorOpened(int roomIndex)
+    private void OnDoorOpened(Door door)
     {
-        if (roomIndex >= 0 && roomIndex < _rooms.Count)
+        // Reveal nearby regions
+        Vector2I tilePos = new Vector2I(
+            (int)(door.Position.X / TileSize),
+            (int)(door.Position.Y / TileSize)
+        );
+
+        for (int i = 0; i < _regions.Count; i++)
         {
-            _rooms[roomIndex].Reveal();
+            if (_regionRevealed.ContainsKey(i) && _regionRevealed[i]) continue;
+
+            // Check if door is near this region
+            foreach (var tile in _regions[i])
+            {
+                if (Math.Abs(tile.X - tilePos.X) <= 3 && Math.Abs(tile.Y - tilePos.Y) <= 3)
+                {
+                    RevealRegion(i);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void RevealRegion(int regionIndex)
+    {
+        if (_regionRevealed.ContainsKey(regionIndex) && _regionRevealed[regionIndex]) return;
+
+        _regionRevealed[regionIndex] = true;
+
+        if (_regionFogOverlays.ContainsKey(regionIndex))
+        {
+            var fog = _regionFogOverlays[regionIndex];
+            var tween = CreateTween();
+            tween.TweenProperty(fog, "modulate:a", 0.0f, 0.5f);
+            tween.TweenCallback(Callable.From(() => fog.QueueFree()));
+        }
+    }
+
+    private void SpawnEnemiesInRegions()
+    {
+        var enemyScene = GD.Load<PackedScene>("res://Scenes/Enemy.tscn");
+        if (enemyScene == null) return;
+
+        // Collect all floor tiles
+        List<Vector2I> floorTiles = new();
+        for (int x = 0; x < MapWidth; x++)
+        {
+            for (int y = 0; y < MapHeight; y++)
+            {
+                if (_map[x, y] == 0)
+                {
+                    floorTiles.Add(new Vector2I(x, y));
+                }
+            }
+        }
+
+        // Get player start position to avoid spawning enemies too close
+        Vector2 playerStart = GetPlayerStartPosition();
+        Vector2I playerTile = new Vector2I(
+            (int)(playerStart.X / TileSize),
+            (int)(playerStart.Y / TileSize)
+        );
+
+        // Spawn enemies throughout the dungeon
+        int totalEnemies = _rng.RandiRange(20, 35);
+
+        for (int i = 0; i < totalEnemies && floorTiles.Count > 0; i++)
+        {
+            int index = _rng.RandiRange(0, floorTiles.Count - 1);
+            Vector2I tile = floorTiles[index];
+            floorTiles.RemoveAt(index);
+
+            // Don't spawn too close to player start
+            if (Math.Abs(tile.X - playerTile.X) < 8 && Math.Abs(tile.Y - playerTile.Y) < 8)
+            {
+                i--;
+                continue;
+            }
+
+            var enemy = enemyScene.Instantiate<Enemy>();
+            enemy.Position = new Vector2(tile.X * TileSize + TileSize / 2, tile.Y * TileSize + TileSize / 2);
+            AddChild(enemy);
         }
     }
 
@@ -442,23 +737,13 @@ public partial class DungeonFloor : Node2D
         var navRegion = new NavigationRegion2D();
         var navPoly = new NavigationPolygon();
 
-        float minX = float.MaxValue, maxX = float.MinValue;
-        float minY = float.MaxValue, maxY = float.MinValue;
-
-        foreach (var room in _rooms)
-        {
-            minX = Mathf.Min(minX, room.Position.X - room.Width / 2 - 150);
-            maxX = Mathf.Max(maxX, room.Position.X + room.Width / 2 + 150);
-            minY = Mathf.Min(minY, room.Position.Y - room.Height / 2 - 150);
-            maxY = Mathf.Max(maxY, room.Position.Y + room.Height / 2 + 150);
-        }
-
+        // Create a simple bounding polygon
         var outline = new Vector2[]
         {
-            new Vector2(minX, minY),
-            new Vector2(maxX, minY),
-            new Vector2(maxX, maxY),
-            new Vector2(minX, maxY)
+            new Vector2(0, 0),
+            new Vector2(MapWidth * TileSize, 0),
+            new Vector2(MapWidth * TileSize, MapHeight * TileSize),
+            new Vector2(0, MapHeight * TileSize)
         };
 
         navPoly.AddOutline(outline);
@@ -468,13 +753,31 @@ public partial class DungeonFloor : Node2D
         AddChild(navRegion);
     }
 
+    public Vector2 GetPlayerStartPosition()
+    {
+        // Find a floor tile near the center
+        int centerX = MapWidth / 2;
+        int centerY = MapHeight / 2;
+
+        for (int radius = 0; radius < Math.Max(MapWidth, MapHeight); radius++)
+        {
+            for (int x = centerX - radius; x <= centerX + radius; x++)
+            {
+                for (int y = centerY - radius; y <= centerY + radius; y++)
+                {
+                    if (x >= 0 && x < MapWidth && y >= 0 && y < MapHeight && _map[x, y] == 0)
+                    {
+                        return new Vector2(x * TileSize + TileSize / 2, y * TileSize + TileSize / 2);
+                    }
+                }
+            }
+        }
+
+        return new Vector2(MapWidth * TileSize / 2, MapHeight * TileSize / 2);
+    }
+
     public Room? GetStartRoom()
     {
         return _rooms.Count > 0 ? _rooms[0] : null;
-    }
-
-    public Vector2 GetPlayerStartPosition()
-    {
-        return _rooms.Count > 0 ? _rooms[0].Position : Vector2.Zero;
     }
 }

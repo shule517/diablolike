@@ -32,6 +32,12 @@ public partial class Room : Node2D
     private Node2D? _enemyContainer;
     private bool _enemiesSpawned = false;
 
+    // Neighbor tracking - true means there's an adjacent room (no wall needed)
+    private bool _hasLeftNeighbor = false;
+    private bool _hasRightNeighbor = false;
+    private bool _hasTopNeighbor = false;
+    private bool _hasBottomNeighbor = false;
+
     // Track walkable areas for enemy spawning
     private List<Rect2> _walkableAreas = new();
 
@@ -94,11 +100,51 @@ public partial class Room : Node2D
         AddFloorDetails();
     }
 
+    public void SetNeighbors(bool hasLeft, bool hasRight, bool hasTop, bool hasBottom)
+    {
+        _hasLeftNeighbor = hasLeft;
+        _hasRightNeighbor = hasRight;
+        _hasTopNeighbor = hasTop;
+        _hasBottomNeighbor = hasBottom;
+    }
+
     private void CreateRectangularRoom()
     {
-        CreateFloorSection(new Vector2(-Width / 2, -Height / 2), new Vector2(Width, Height));
-        CreateWallsForSection(new Vector2(-Width / 2, -Height / 2), new Vector2(Width, Height));
+        // Floor is now created by DungeonFloor, so we only create walls on outer edges
+        CreateOuterWalls();
         _walkableAreas.Add(new Rect2(-Width / 2 + 30, -Height / 2 + 30, Width - 60, Height - 60));
+    }
+
+    private void CreateOuterWalls()
+    {
+        int wallThickness = 20;
+        float halfW = Width / 2;
+        float halfH = Height / 2;
+
+        // Only create walls on sides WITHOUT neighbors
+        // Top wall
+        if (!_hasTopNeighbor)
+        {
+            CreateWallSegment(new Vector2(-halfW, -halfH), new Vector2(Width, wallThickness));
+        }
+
+        // Bottom wall
+        if (!_hasBottomNeighbor)
+        {
+            CreateWallSegment(new Vector2(-halfW, halfH - wallThickness), new Vector2(Width, wallThickness));
+        }
+
+        // Left wall
+        if (!_hasLeftNeighbor)
+        {
+            CreateWallSegment(new Vector2(-halfW, -halfH), new Vector2(wallThickness, Height));
+        }
+
+        // Right wall
+        if (!_hasRightNeighbor)
+        {
+            CreateWallSegment(new Vector2(halfW - wallThickness, -halfH), new Vector2(wallThickness, Height));
+        }
     }
 
     private void CreateLShapedRoom()
@@ -561,6 +607,75 @@ public partial class Room : Node2D
         opening.Color = _floorColor;
         opening.ZIndex = 1;
         AddChild(opening);
+    }
+
+    public void RemoveWallCollisionAt(Vector2 localPosition, bool isHorizontal, float openingSize)
+    {
+        if (_wallContainer == null) return;
+
+        // Find and disable wall collisions at the door position
+        foreach (var child in _wallContainer.GetChildren())
+        {
+            if (child is StaticBody2D wall)
+            {
+                var collision = wall.GetNodeOrNull<CollisionShape2D>("CollisionShape2D");
+                if (collision == null)
+                {
+                    // Try to find any CollisionShape2D child
+                    foreach (var wallChild in wall.GetChildren())
+                    {
+                        if (wallChild is CollisionShape2D cs)
+                        {
+                            collision = cs;
+                            break;
+                        }
+                    }
+                }
+
+                if (collision?.Shape is RectangleShape2D rectShape)
+                {
+                    Vector2 wallPos = wall.Position;
+                    Vector2 wallSize = rectShape.Size;
+                    Vector2 collisionCenter = wallPos + collision.Position;
+
+                    // Check if wall overlaps with door position
+                    Rect2 wallRect = new Rect2(
+                        collisionCenter.X - wallSize.X / 2,
+                        collisionCenter.Y - wallSize.Y / 2,
+                        wallSize.X,
+                        wallSize.Y
+                    );
+
+                    float halfOpening = openingSize / 2;
+                    Rect2 doorRect;
+
+                    if (isHorizontal)
+                    {
+                        doorRect = new Rect2(
+                            localPosition.X - halfOpening,
+                            localPosition.Y - 15,
+                            openingSize,
+                            30
+                        );
+                    }
+                    else
+                    {
+                        doorRect = new Rect2(
+                            localPosition.X - 15,
+                            localPosition.Y - halfOpening,
+                            30,
+                            openingSize
+                        );
+                    }
+
+                    if (wallRect.Intersects(doorRect))
+                    {
+                        // Disable this wall's collision at door
+                        collision.SetDeferred("disabled", true);
+                    }
+                }
+            }
+        }
     }
 
     public int GetAliveEnemyCount()
