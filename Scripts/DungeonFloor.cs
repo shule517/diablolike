@@ -5,8 +5,8 @@ using System.Collections.Generic;
 public partial class DungeonFloor : Node2D
 {
     [Export] public int FloorNumber = 1;
-    [Export] public int MapWidth = 80;
-    [Export] public int MapHeight = 60;
+    [Export] public int MapWidth = 240;
+    [Export] public int MapHeight = 180;
     [Export] public int TileSize = 16;
     [Export] public float InitialFillPercent = 0.42f;
     [Export] public int SmoothIterations = 4;
@@ -457,7 +457,7 @@ public partial class DungeonFloor : Node2D
         if (_decorContainer == null) return;
 
         int torchCount = 0;
-        int maxTorches = 30;
+        int maxTorches = 150;
 
         for (int x = 2; x < MapWidth - 2 && torchCount < maxTorches; x += _rng.RandiRange(6, 12))
         {
@@ -711,7 +711,7 @@ public partial class DungeonFloor : Node2D
         );
 
         // Spawn enemies throughout the dungeon
-        int totalEnemies = _rng.RandiRange(20, 35);
+        int totalEnemies = _rng.RandiRange(100, 150);
 
         for (int i = 0; i < totalEnemies && floorTiles.Count > 0; i++)
         {
