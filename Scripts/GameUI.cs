@@ -12,6 +12,10 @@ public partial class GameUI : CanvasLayer
     private Panel? _gameOverPanel;
     private Panel? _levelUpPanel;
 
+    private ColorRect? _healthFill;
+    private ColorRect? _manaFill;
+    private ColorRect? _expFill;
+
     private Player? _player;
 
     public override void _Ready()
@@ -24,6 +28,10 @@ public partial class GameUI : CanvasLayer
         _manaLabel = GetNodeOrNull<Label>("ManaBar/Label");
         _gameOverPanel = GetNodeOrNull<Panel>("GameOverPanel");
         _levelUpPanel = GetNodeOrNull<Panel>("LevelUpPanel");
+
+        _healthFill = GetNodeOrNull<ColorRect>("HealthBar/Fill");
+        _manaFill = GetNodeOrNull<ColorRect>("ManaBar/Fill");
+        _expFill = GetNodeOrNull<ColorRect>("ExpBar/Fill");
 
         if (_gameOverPanel != null)
             _gameOverPanel.Visible = false;
@@ -62,6 +70,12 @@ public partial class GameUI : CanvasLayer
             _healthBar.Value = current;
         }
 
+        if (_healthFill != null && _healthBar != null)
+        {
+            float ratio = max > 0 ? (float)current / max : 0;
+            _healthFill.AnchorRight = ratio;
+        }
+
         if (_healthLabel != null)
         {
             _healthLabel.Text = $"{current}/{max}";
@@ -76,6 +90,12 @@ public partial class GameUI : CanvasLayer
             _manaBar.Value = current;
         }
 
+        if (_manaFill != null && _manaBar != null)
+        {
+            float ratio = max > 0 ? (float)current / max : 0;
+            _manaFill.AnchorRight = ratio;
+        }
+
         if (_manaLabel != null)
         {
             _manaLabel.Text = $"{current}/{max}";
@@ -88,6 +108,12 @@ public partial class GameUI : CanvasLayer
         {
             _expBar.MaxValue = toNext;
             _expBar.Value = current;
+        }
+
+        if (_expFill != null)
+        {
+            float ratio = toNext > 0 ? (float)current / toNext : 0;
+            _expFill.AnchorRight = ratio;
         }
     }
 

@@ -17,6 +17,7 @@ public partial class Enemy : CharacterBody2D
     private float _attackTimer = 0.0f;
     private AnimatedSprite2D? _sprite;
     private NavigationAgent2D? _navigationAgent;
+    private ProgressBar? _healthBar;
     private bool _isDead = false;
 
     private enum State
@@ -37,12 +38,15 @@ public partial class Enemy : CharacterBody2D
         CurrentHealth = MaxHealth;
         _sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
         _navigationAgent = GetNodeOrNull<NavigationAgent2D>("NavigationAgent2D");
+        _healthBar = GetNodeOrNull<ProgressBar>("HealthBar");
 
         if (_navigationAgent != null)
         {
             _navigationAgent.PathDesiredDistance = 4.0f;
             _navigationAgent.TargetDesiredDistance = 4.0f;
         }
+
+        UpdateHealthBar();
 
         // Find player in the scene
         CallDeferred(nameof(FindPlayer));
@@ -169,6 +173,7 @@ public partial class Enemy : CharacterBody2D
             return;
 
         CurrentHealth -= damage;
+        UpdateHealthBar();
 
         // Flash red
         if (_sprite != null)
@@ -194,6 +199,15 @@ public partial class Enemy : CharacterBody2D
         if (CurrentHealth <= 0)
         {
             Die();
+        }
+    }
+
+    private void UpdateHealthBar()
+    {
+        if (_healthBar != null)
+        {
+            _healthBar.MaxValue = MaxHealth;
+            _healthBar.Value = CurrentHealth;
         }
     }
 
