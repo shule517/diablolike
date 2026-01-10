@@ -3,12 +3,31 @@ using System;
 
 public partial class Player : CharacterBody2D
 {
-	[Export] public float Speed = 200.0f;
-	[Export] public int MaxHealth = 100;
-	[Export] public int MaxMana = 50;
-	[Export] public int AttackDamage = 10;
+	[Export] public float BaseSpeed = 150.0f;
+	[Export] public int BaseMaxHealth = 50;
+	[Export] public int BaseMaxMana = 30;
+	[Export] public int BaseAttackDamage = 5;
 	[Export] public float AttackRange = 50.0f;
-	[Export] public float AttackCooldown = 0.5f;
+	[Export] public float BaseAttackCooldown = 0.6f;
+
+	// Stats - 力、素早さ、丈夫さ、賢さ、運
+	public int Strength { get; private set; } = 5;      // 力 - Attack damage
+	public int Agility { get; private set; } = 5;       // 素早さ - Speed, Attack speed
+	public int Vitality { get; private set; } = 5;      // 丈夫さ - Max HP
+	public int Intelligence { get; private set; } = 5;  // 賢さ - Max MP, Skill damage
+	public int Luck { get; private set; } = 5;          // 運 - Critical, Drop rate
+
+	public int StatPoints { get; private set; } = 0;    // Available stat points
+	public int BonusAttackDamage { get; private set; } = 0; // Bonus from weapons/items
+
+	// Calculated stats
+	public float Speed => BaseSpeed + Agility * 5;
+	public int MaxHealth => BaseMaxHealth + Vitality * 10;
+	public int MaxMana => BaseMaxMana + Intelligence * 5;
+	public int AttackDamage => BaseAttackDamage + Strength * 2 + BonusAttackDamage;
+	public float AttackCooldown => Math.Max(0.2f, BaseAttackCooldown - Agility * 0.02f);
+	public float CriticalChance => Luck * 0.02f; // 2% per luck point
+	public int SkillDamage => (int)(AttackDamage * 2 * (1 + Intelligence * 0.05f)); // Intelligence boosts skill damage
 
 	public int CurrentHealth { get; private set; }
 	public int CurrentMana { get; private set; }
@@ -38,6 +57,12 @@ public partial class Player : CharacterBody2D
 
 	[Signal]
 	public delegate void PlayerDiedEventHandler();
+
+	[Signal]
+	public delegate void StatPointsChangedEventHandler(int statPoints);
+
+	[Signal]
+	public delegate void StatsChangedEventHandler();
 
 	public override void _Ready()
 	{
@@ -249,7 +274,7 @@ public partial class Player : CharacterBody2D
 		{
 			if (body is Enemy enemy)
 			{
-				enemy.TakeDamage(AttackDamage * 2);
+				enemy.TakeDamage(SkillDamage);
 			}
 		};
 
@@ -263,8 +288,30 @@ public partial class Player : CharacterBody2D
 	{
 		if (body is Enemy enemy)
 		{
-			enemy.TakeDamage(AttackDamage);
+			int damage = AttackDamage;
+			bool isCritical = GD.Randf() < CriticalChance;
+			if (isCritical)
+			{
+				damage = (int)(damage * 1.5f);
+				ShowCriticalEffect();
+			}
+			enemy.TakeDamage(damage);
 		}
+	}
+
+	private void ShowCriticalEffect()
+	{
+		var critLabel = new Label();
+		critLabel.Text = "CRITICAL!";
+		critLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.8f, 0.0f));
+		critLabel.AddThemeFontSizeOverride("font_size", 28);
+		critLabel.GlobalPosition = GlobalPosition + new Vector2(-50, -60);
+		GetParent().AddChild(critLabel);
+
+		var tween = critLabel.CreateTween();
+		tween.TweenProperty(critLabel, "position:y", critLabel.Position.Y - 40, 0.5f);
+		tween.Parallel().TweenProperty(critLabel, "modulate:a", 0.0f, 0.5f);
+		tween.TweenCallback(Callable.From(() => critLabel.QueueFree()));
 	}
 
 	public void TakeDamage(int damage)
@@ -333,6 +380,11 @@ public partial class Player : CharacterBody2D
 		EmitSignal(SignalName.ManaChanged, CurrentMana, MaxMana);
 	}
 
+	public void AddBonusDamage(int amount)
+	{
+		BonusAttackDamage += amount;
+	}
+
 	public void GainExperience(int amount)
 	{
 		Experience += amount;
@@ -351,15 +403,54 @@ public partial class Player : CharacterBody2D
 	private void PerformLevelUp()
 	{
 		Level++;
-		MaxHealth += 10;
-		MaxMana += 5;
-		AttackDamage += 2;
+		StatPoints += 5; // 5 stat points per level
+
+		// Restore HP/MP on level up
 		CurrentHealth = MaxHealth;
 		CurrentMana = MaxMana;
 
 		EmitSignal(SignalName.LevelUp, Level);
+		EmitSignal(SignalName.StatPointsChanged, StatPoints);
 		EmitSignal(SignalName.HealthChanged, CurrentHealth, MaxHealth);
 		EmitSignal(SignalName.ManaChanged, CurrentMana, MaxMana);
+	}
+
+	public bool AddStat(string statName)
+	{
+		if (StatPoints <= 0) return false;
+
+		switch (statName.ToLower())
+		{
+			case "strength":
+			case "str":
+				Strength++;
+				break;
+			case "agility":
+			case "agi":
+				Agility++;
+				break;
+			case "vitality":
+			case "vit":
+				Vitality++;
+				break;
+			case "intelligence":
+			case "int":
+				Intelligence++;
+				break;
+			case "luck":
+			case "luk":
+				Luck++;
+				break;
+			default:
+				return false;
+		}
+
+		StatPoints--;
+		EmitSignal(SignalName.StatPointsChanged, StatPoints);
+		EmitSignal(SignalName.StatsChanged);
+		EmitSignal(SignalName.HealthChanged, CurrentHealth, MaxHealth);
+		EmitSignal(SignalName.ManaChanged, CurrentMana, MaxMana);
+		return true;
 	}
 
 	private int GetExperienceToNextLevel()

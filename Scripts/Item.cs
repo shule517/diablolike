@@ -95,7 +95,7 @@ public partial class Item : Area2D
                 player.RestoreMana(Value);
                 break;
             case Type.Weapon:
-                player.AttackDamage += Value;
+                player.AddBonusDamage(Value);
                 break;
         }
     }
