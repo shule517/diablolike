@@ -11,8 +11,10 @@ public partial class DungeonFloor : Node2D
     [Export] public float InitialFillPercent = 0.42f;
     [Export] public int SmoothIterations = 4;
     [Export] public int MinPassageWidth = 3;
+    [Export] public int RoomCount = 12;
 
     private int[,] _map = new int[0, 0]; // 0 = floor, 1 = wall
+    private List<Rect2I> _carvedRooms = new();
     private List<Room> _rooms = new();
     private List<Door> _doors = new();
     private List<HashSet<Vector2I>> _regions = new();
@@ -28,6 +30,7 @@ public partial class DungeonFloor : Node2D
     private Node2D? _floorContainer;
     private Node2D? _wallContainer;
     private Node2D? _decorContainer;
+    private CanvasModulate? _canvasModulate;
     private Dictionary<int, Node2D> _regionFogOverlays = new();
     private Dictionary<int, bool> _regionRevealed = new();
 
@@ -41,9 +44,22 @@ public partial class DungeonFloor : Node2D
         _wallContainer = new Node2D { Name = "WallContainer" };
         _decorContainer = new Node2D { Name = "DecorContainer" };
 
+        // Add a large black background to hide everything outside the light
+        var blackBackground = new ColorRect();
+        blackBackground.Size = new Vector2(MapWidth * TileSize + 4000, MapHeight * TileSize + 4000);
+        blackBackground.Position = new Vector2(-2000, -2000);
+        blackBackground.Color = new Color(0, 0, 0, 1);
+        blackBackground.ZIndex = -100;
+        AddChild(blackBackground);
+
         AddChild(_floorContainer);
         AddChild(_wallContainer);
         AddChild(_decorContainer);
+
+        // Add darkness - CanvasModulate darkens everything, player's PointLight2D reveals areas
+        _canvasModulate = new CanvasModulate();
+        _canvasModulate.Color = new Color(0.02f, 0.02f, 0.03f); // Even darker ambient
+        AddChild(_canvasModulate);
 
         GenerateMap();
         CreateVisuals();
@@ -55,37 +71,320 @@ public partial class DungeonFloor : Node2D
     {
         _map = new int[MapWidth, MapHeight];
 
-        // Initialize with random noise
+        // Fill with walls first
         for (int x = 0; x < MapWidth; x++)
         {
             for (int y = 0; y < MapHeight; y++)
             {
-                // Edges are always walls
-                if (x == 0 || x == MapWidth - 1 || y == 0 || y == MapHeight - 1)
-                {
-                    _map[x, y] = 1;
-                }
-                else
-                {
-                    _map[x, y] = _rng.Randf() < InitialFillPercent ? 1 : 0;
-                }
+                _map[x, y] = 1;
             }
         }
 
-        // Apply cellular automata smoothing
-        for (int i = 0; i < SmoothIterations; i++)
-        {
-            SmoothMap();
-        }
+        // Carve distinct rooms of varying sizes
+        CarveRooms();
+
+        // Connect rooms with corridors
+        ConnectRooms();
+
+        // Add some cellular automata noise to organic areas between rooms
+        AddOrganicAreas();
 
         // Ensure connectivity
         EnsureConnectivity();
 
         // Widen narrow passages so player can pass through
         WidenNarrowPassages();
+    }
 
-        // Add some organic features
-        AddAlcovesAndVariations();
+    private void CarveRooms()
+    {
+        int attempts = 0;
+        int maxAttempts = 500;
+
+        while (_carvedRooms.Count < RoomCount && attempts < maxAttempts)
+        {
+            attempts++;
+
+            // Varied room sizes: small, medium, large
+            int width, height;
+            float sizeRoll = _rng.Randf();
+
+            if (sizeRoll < 0.25f)
+            {
+                // Small room (8-12 tiles)
+                width = _rng.RandiRange(8, 12);
+                height = _rng.RandiRange(8, 12);
+            }
+            else if (sizeRoll < 0.6f)
+            {
+                // Medium room (14-22 tiles)
+                width = _rng.RandiRange(14, 22);
+                height = _rng.RandiRange(14, 22);
+            }
+            else if (sizeRoll < 0.85f)
+            {
+                // Large room (24-35 tiles)
+                width = _rng.RandiRange(24, 35);
+                height = _rng.RandiRange(24, 35);
+            }
+            else
+            {
+                // Very large room (36-50 tiles)
+                width = _rng.RandiRange(36, 50);
+                height = _rng.RandiRange(28, 40);
+            }
+
+            // Random position
+            int x = _rng.RandiRange(3, MapWidth - width - 3);
+            int y = _rng.RandiRange(3, MapHeight - height - 3);
+
+            Rect2I newRoom = new Rect2I(x, y, width, height);
+
+            // Check for overlap with existing rooms
+            bool overlaps = false;
+            foreach (var room in _carvedRooms)
+            {
+                Rect2I expanded = new Rect2I(room.Position.X - 4, room.Position.Y - 4,
+                                              room.Size.X + 8, room.Size.Y + 8);
+                if (expanded.Intersects(newRoom))
+                {
+                    overlaps = true;
+                    break;
+                }
+            }
+
+            if (!overlaps)
+            {
+                _carvedRooms.Add(newRoom);
+                CarveRoomShape(newRoom);
+            }
+        }
+    }
+
+    private void CarveRoomShape(Rect2I room)
+    {
+        // Different room shapes
+        float shapeRoll = _rng.Randf();
+
+        if (shapeRoll < 0.5f)
+        {
+            // Rectangle with slightly irregular edges
+            for (int x = room.Position.X; x < room.Position.X + room.Size.X; x++)
+            {
+                for (int y = room.Position.Y; y < room.Position.Y + room.Size.Y; y++)
+                {
+                    if (x > 0 && x < MapWidth - 1 && y > 0 && y < MapHeight - 1)
+                    {
+                        _map[x, y] = 0;
+                    }
+                }
+            }
+            // Add irregular edges
+            AddIrregularEdges(room);
+        }
+        else if (shapeRoll < 0.75f)
+        {
+            // L-shaped or T-shaped
+            int halfW = room.Size.X / 2;
+            int halfH = room.Size.Y / 2;
+
+            // Horizontal part
+            for (int x = room.Position.X; x < room.Position.X + room.Size.X; x++)
+            {
+                for (int y = room.Position.Y; y < room.Position.Y + halfH + 3; y++)
+                {
+                    if (x > 0 && x < MapWidth - 1 && y > 0 && y < MapHeight - 1)
+                        _map[x, y] = 0;
+                }
+            }
+            // Vertical part
+            for (int x = room.Position.X; x < room.Position.X + halfW + 3; x++)
+            {
+                for (int y = room.Position.Y; y < room.Position.Y + room.Size.Y; y++)
+                {
+                    if (x > 0 && x < MapWidth - 1 && y > 0 && y < MapHeight - 1)
+                        _map[x, y] = 0;
+                }
+            }
+        }
+        else
+        {
+            // Rounded/organic shape
+            int centerX = room.Position.X + room.Size.X / 2;
+            int centerY = room.Position.Y + room.Size.Y / 2;
+            int radiusX = room.Size.X / 2;
+            int radiusY = room.Size.Y / 2;
+
+            for (int x = room.Position.X; x < room.Position.X + room.Size.X; x++)
+            {
+                for (int y = room.Position.Y; y < room.Position.Y + room.Size.Y; y++)
+                {
+                    float dx = (x - centerX) / (float)radiusX;
+                    float dy = (y - centerY) / (float)radiusY;
+                    if (dx * dx + dy * dy <= 1.0f + _rng.Randf() * 0.2f)
+                    {
+                        if (x > 0 && x < MapWidth - 1 && y > 0 && y < MapHeight - 1)
+                            _map[x, y] = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    private void AddIrregularEdges(Rect2I room)
+    {
+        // Add small protrusions and indentations
+        int irregularities = _rng.RandiRange(3, 8);
+        for (int i = 0; i < irregularities; i++)
+        {
+            int side = _rng.RandiRange(0, 3);
+            int size = _rng.RandiRange(2, 5);
+
+            int px, py;
+            switch (side)
+            {
+                case 0: // Top
+                    px = _rng.RandiRange(room.Position.X + 2, room.Position.X + room.Size.X - 3);
+                    py = room.Position.Y - 1;
+                    for (int dx = 0; dx < size; dx++)
+                        for (int dy = 0; dy < _rng.RandiRange(2, 4); dy++)
+                            if (px + dx > 0 && px + dx < MapWidth - 1 && py - dy > 0)
+                                _map[px + dx, py - dy] = 0;
+                    break;
+                case 1: // Bottom
+                    px = _rng.RandiRange(room.Position.X + 2, room.Position.X + room.Size.X - 3);
+                    py = room.Position.Y + room.Size.Y;
+                    for (int dx = 0; dx < size; dx++)
+                        for (int dy = 0; dy < _rng.RandiRange(2, 4); dy++)
+                            if (px + dx > 0 && px + dx < MapWidth - 1 && py + dy < MapHeight - 1)
+                                _map[px + dx, py + dy] = 0;
+                    break;
+                case 2: // Left
+                    px = room.Position.X - 1;
+                    py = _rng.RandiRange(room.Position.Y + 2, room.Position.Y + room.Size.Y - 3);
+                    for (int dy = 0; dy < size; dy++)
+                        for (int dx = 0; dx < _rng.RandiRange(2, 4); dx++)
+                            if (px - dx > 0 && py + dy > 0 && py + dy < MapHeight - 1)
+                                _map[px - dx, py + dy] = 0;
+                    break;
+                case 3: // Right
+                    px = room.Position.X + room.Size.X;
+                    py = _rng.RandiRange(room.Position.Y + 2, room.Position.Y + room.Size.Y - 3);
+                    for (int dy = 0; dy < size; dy++)
+                        for (int dx = 0; dx < _rng.RandiRange(2, 4); dx++)
+                            if (px + dx < MapWidth - 1 && py + dy > 0 && py + dy < MapHeight - 1)
+                                _map[px + dx, py + dy] = 0;
+                    break;
+            }
+        }
+    }
+
+    private void ConnectRooms()
+    {
+        if (_carvedRooms.Count < 2) return;
+
+        // Sort rooms for natural corridor layout
+        var sortedRooms = new List<Rect2I>(_carvedRooms);
+        sortedRooms.Sort((a, b) => (a.Position.X + a.Position.Y).CompareTo(b.Position.X + b.Position.Y));
+
+        // Connect each room to the next
+        for (int i = 0; i < sortedRooms.Count - 1; i++)
+        {
+            Vector2I centerA = new Vector2I(
+                sortedRooms[i].Position.X + sortedRooms[i].Size.X / 2,
+                sortedRooms[i].Position.Y + sortedRooms[i].Size.Y / 2);
+            Vector2I centerB = new Vector2I(
+                sortedRooms[i + 1].Position.X + sortedRooms[i + 1].Size.X / 2,
+                sortedRooms[i + 1].Position.Y + sortedRooms[i + 1].Size.Y / 2);
+
+            CarveCorridor(centerA, centerB);
+        }
+
+        // Add some extra connections
+        int extraConnections = _rng.RandiRange(2, 5);
+        for (int i = 0; i < extraConnections; i++)
+        {
+            int indexA = _rng.RandiRange(0, _carvedRooms.Count - 1);
+            int indexB = _rng.RandiRange(0, _carvedRooms.Count - 1);
+            if (indexA != indexB)
+            {
+                Vector2I centerA = new Vector2I(
+                    _carvedRooms[indexA].Position.X + _carvedRooms[indexA].Size.X / 2,
+                    _carvedRooms[indexA].Position.Y + _carvedRooms[indexA].Size.Y / 2);
+                Vector2I centerB = new Vector2I(
+                    _carvedRooms[indexB].Position.X + _carvedRooms[indexB].Size.X / 2,
+                    _carvedRooms[indexB].Position.Y + _carvedRooms[indexB].Size.Y / 2);
+                CarveCorridor(centerA, centerB);
+            }
+        }
+    }
+
+    private void CarveCorridor(Vector2I from, Vector2I to)
+    {
+        Vector2I current = from;
+        int corridorWidth = _rng.RandiRange(3, 5);
+
+        while (current != to)
+        {
+            // Carve corridor at current position
+            for (int dx = -corridorWidth / 2; dx <= corridorWidth / 2; dx++)
+            {
+                for (int dy = -corridorWidth / 2; dy <= corridorWidth / 2; dy++)
+                {
+                    int nx = current.X + dx;
+                    int ny = current.Y + dy;
+                    if (nx > 0 && nx < MapWidth - 1 && ny > 0 && ny < MapHeight - 1)
+                    {
+                        _map[nx, ny] = 0;
+                    }
+                }
+            }
+
+            // Move towards target (L-shaped corridors)
+            if (_rng.Randf() < 0.5f)
+            {
+                if (current.X != to.X)
+                    current.X += current.X < to.X ? 1 : -1;
+                else if (current.Y != to.Y)
+                    current.Y += current.Y < to.Y ? 1 : -1;
+            }
+            else
+            {
+                if (current.Y != to.Y)
+                    current.Y += current.Y < to.Y ? 1 : -1;
+                else if (current.X != to.X)
+                    current.X += current.X < to.X ? 1 : -1;
+            }
+        }
+    }
+
+    private void AddOrganicAreas()
+    {
+        // Add some organic cave-like areas between rooms
+        for (int i = 0; i < 5; i++)
+        {
+            int x = _rng.RandiRange(20, MapWidth - 20);
+            int y = _rng.RandiRange(20, MapHeight - 20);
+
+            // Small organic blob
+            int radius = _rng.RandiRange(5, 12);
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (dist <= radius + _rng.Randf() * 3 - 1.5f)
+                    {
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if (nx > 1 && nx < MapWidth - 2 && ny > 1 && ny < MapHeight - 2)
+                        {
+                            _map[nx, ny] = 0;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void WidenNarrowPassages()
@@ -141,46 +440,6 @@ public partial class DungeonFloor : Node2D
                 }
             }
         }
-    }
-
-    private void SmoothMap()
-    {
-        int[,] newMap = new int[MapWidth, MapHeight];
-
-        for (int x = 0; x < MapWidth; x++)
-        {
-            for (int y = 0; y < MapHeight; y++)
-            {
-                int neighborWalls = CountNeighborWalls(x, y);
-
-                if (neighborWalls > 4)
-                    newMap[x, y] = 1;
-                else if (neighborWalls < 4)
-                    newMap[x, y] = 0;
-                else
-                    newMap[x, y] = _map[x, y];
-            }
-        }
-
-        _map = newMap;
-    }
-
-    private int CountNeighborWalls(int x, int y)
-    {
-        int count = 0;
-        for (int nx = x - 1; nx <= x + 1; nx++)
-        {
-            for (int ny = y - 1; ny <= y + 1; ny++)
-            {
-                if (nx == x && ny == y) continue;
-
-                if (nx < 0 || nx >= MapWidth || ny < 0 || ny >= MapHeight)
-                    count++;
-                else if (_map[nx, ny] == 1)
-                    count++;
-            }
-        }
-        return count;
     }
 
     private void EnsureConnectivity()
@@ -327,47 +586,6 @@ public partial class DungeonFloor : Node2D
         }
     }
 
-    private void AddAlcovesAndVariations()
-    {
-        // Add random alcoves and protrusions for organic feel
-        for (int i = 0; i < 20; i++)
-        {
-            int x = _rng.RandiRange(5, MapWidth - 6);
-            int y = _rng.RandiRange(5, MapHeight - 6);
-
-            if (_map[x, y] == 0) // If it's floor
-            {
-                // Create small alcove
-                int alcoveSize = _rng.RandiRange(2, 4);
-                float angle = _rng.Randf() * Mathf.Tau;
-
-                for (int j = 0; j < alcoveSize; j++)
-                {
-                    int ax = x + (int)(Mathf.Cos(angle) * j);
-                    int ay = y + (int)(Mathf.Sin(angle) * j);
-
-                    if (ax > 1 && ax < MapWidth - 2 && ay > 1 && ay < MapHeight - 2)
-                    {
-                        _map[ax, ay] = 0;
-                    }
-                }
-            }
-        }
-
-        // Add some pillars/obstacles
-        for (int i = 0; i < 15; i++)
-        {
-            int x = _rng.RandiRange(5, MapWidth - 6);
-            int y = _rng.RandiRange(5, MapHeight - 6);
-
-            // Only place pillar if surrounded by floor
-            if (_map[x, y] == 0 && CountNeighborWalls(x, y) == 0)
-            {
-                _map[x, y] = 1;
-            }
-        }
-    }
-
     private void CreateVisuals()
     {
         if (_floorContainer == null || _wallContainer == null) return;
@@ -448,6 +666,19 @@ public partial class DungeonFloor : Node2D
             edge.Color = _wallDarkColor;
             wall.AddChild(edge);
         }
+
+        // Add light occluder for shadows
+        var occluder = new LightOccluder2D();
+        var occluderPoly = new OccluderPolygon2D();
+        occluderPoly.Polygon = new Vector2[]
+        {
+            new Vector2(0, 0),
+            new Vector2(TileSize, 0),
+            new Vector2(TileSize, TileSize),
+            new Vector2(0, TileSize)
+        };
+        occluder.Occluder = occluderPoly;
+        wall.AddChild(occluder);
 
         _wallContainer.AddChild(wall);
     }
