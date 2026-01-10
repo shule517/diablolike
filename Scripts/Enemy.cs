@@ -18,7 +18,9 @@ public partial class Enemy : CharacterBody2D
     private AnimatedSprite2D? _sprite;
     private NavigationAgent2D? _navigationAgent;
     private ProgressBar? _healthBar;
+    private ColorRect? _placeholder;
     private bool _isDead = false;
+    private bool _isFlashing = false;
 
     private enum State
     {
@@ -39,6 +41,7 @@ public partial class Enemy : CharacterBody2D
         _sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
         _navigationAgent = GetNodeOrNull<NavigationAgent2D>("NavigationAgent2D");
         _healthBar = GetNodeOrNull<ProgressBar>("HealthBar");
+        _placeholder = GetNodeOrNull<ColorRect>("Placeholder");
 
         if (_navigationAgent != null)
         {
@@ -175,17 +178,10 @@ public partial class Enemy : CharacterBody2D
         CurrentHealth -= damage;
         UpdateHealthBar();
 
-        // Flash red
-        if (_sprite != null)
+        // Flash effect
+        if (!_isFlashing)
         {
-            _sprite.Modulate = new Color(1, 0.3f, 0.3f);
-            GetTree().CreateTimer(0.1).Timeout += () =>
-            {
-                if (_sprite != null && IsInstanceValid(_sprite))
-                {
-                    _sprite.Modulate = Colors.White;
-                }
-            };
+            FlashDamage();
         }
 
         // Knockback
@@ -199,6 +195,42 @@ public partial class Enemy : CharacterBody2D
         if (CurrentHealth <= 0)
         {
             Die();
+        }
+    }
+
+    private async void FlashDamage()
+    {
+        _isFlashing = true;
+        var flashColor = new Color(1, 0.3f, 0.3f);
+        var normalColor = Colors.White;
+        int flashCount = 3;
+        float flashDuration = 0.06f;
+
+        for (int i = 0; i < flashCount; i++)
+        {
+            SetVisualColor(flashColor);
+            await ToSignal(GetTree().CreateTimer(flashDuration), SceneTreeTimer.SignalName.Timeout);
+
+            if (!IsInstanceValid(this) || _isDead) return;
+
+            SetVisualColor(normalColor);
+            await ToSignal(GetTree().CreateTimer(flashDuration), SceneTreeTimer.SignalName.Timeout);
+
+            if (!IsInstanceValid(this) || _isDead) return;
+        }
+
+        _isFlashing = false;
+    }
+
+    private void SetVisualColor(Color color)
+    {
+        if (_sprite != null && IsInstanceValid(_sprite))
+        {
+            _sprite.Modulate = color;
+        }
+        if (_placeholder != null && IsInstanceValid(_placeholder))
+        {
+            _placeholder.Modulate = color;
         }
     }
 

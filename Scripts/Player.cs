@@ -17,8 +17,10 @@ public partial class Player : CharacterBody2D
 
     private float _attackTimer = 0.0f;
     private bool _isAttacking = false;
+    private bool _isFlashing = false;
     private AnimatedSprite2D? _sprite;
     private Area2D? _attackArea;
+    private ColorRect? _placeholder;
 
     [Signal]
     public delegate void HealthChangedEventHandler(int currentHealth, int maxHealth);
@@ -42,6 +44,7 @@ public partial class Player : CharacterBody2D
 
         _sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
         _attackArea = GetNodeOrNull<Area2D>("AttackArea");
+        _placeholder = GetNodeOrNull<ColorRect>("Placeholder");
 
         if (_attackArea != null)
         {
@@ -115,6 +118,7 @@ public partial class Player : CharacterBody2D
         if (_attackArea != null)
         {
             _attackArea.Monitoring = true;
+            ShowAttackEffect();
         }
 
         GetTree().CreateTimer(0.2).Timeout += () =>
@@ -125,6 +129,38 @@ public partial class Player : CharacterBody2D
             }
             _isAttacking = false;
         };
+    }
+
+    private void ShowAttackEffect()
+    {
+        // Create attack arc visual
+        var attackVisual = new Polygon2D();
+
+        // Create arc shape points
+        var points = new Vector2[12];
+        float startAngle = -Mathf.Pi / 4;
+        float endAngle = Mathf.Pi / 4;
+        float radius = 50.0f;
+
+        points[0] = Vector2.Zero;
+        for (int i = 0; i < 11; i++)
+        {
+            float angle = startAngle + (endAngle - startAngle) * i / 10.0f;
+            points[i + 1] = new Vector2(
+                Mathf.Cos(angle) * radius + 30,
+                Mathf.Sin(angle) * radius
+            );
+        }
+
+        attackVisual.Polygon = points;
+        attackVisual.Color = new Color(1.0f, 0.8f, 0.2f, 0.6f);
+
+        AddChild(attackVisual);
+
+        // Fade out and remove
+        var tween = CreateTween();
+        tween.TweenProperty(attackVisual, "modulate:a", 0.0f, 0.15f);
+        tween.TweenCallback(Callable.From(() => attackVisual.QueueFree()));
     }
 
     private void UseSkill()
@@ -140,11 +176,17 @@ public partial class Player : CharacterBody2D
         collision.Shape = shape;
         skillEffect.AddChild(collision);
 
-        var colorRect = new ColorRect();
-        colorRect.Size = new Vector2(200, 200);
-        colorRect.Position = new Vector2(-100, -100);
-        colorRect.Color = new Color(0.5f, 0.5f, 1.0f, 0.5f);
-        skillEffect.AddChild(colorRect);
+        // Create circular visual effect
+        var visual = new Polygon2D();
+        var points = new Vector2[32];
+        for (int i = 0; i < 32; i++)
+        {
+            float angle = Mathf.Tau * i / 32.0f;
+            points[i] = new Vector2(Mathf.Cos(angle) * 100, Mathf.Sin(angle) * 100);
+        }
+        visual.Polygon = points;
+        visual.Color = new Color(0.3f, 0.5f, 1.0f, 0.5f);
+        skillEffect.AddChild(visual);
 
         skillEffect.GlobalPosition = GetGlobalMousePosition();
         skillEffect.CollisionLayer = 0;
@@ -160,10 +202,10 @@ public partial class Player : CharacterBody2D
             }
         };
 
-        GetTree().CreateTimer(0.3).Timeout += () =>
-        {
-            skillEffect.QueueFree();
-        };
+        // Fade out effect
+        var tween = skillEffect.CreateTween();
+        tween.TweenProperty(visual, "modulate:a", 0.0f, 0.3f);
+        tween.TweenCallback(Callable.From(() => skillEffect.QueueFree()));
     }
 
     private void OnAttackAreaBodyEntered(Node2D body)
@@ -180,21 +222,51 @@ public partial class Player : CharacterBody2D
         CurrentHealth = Math.Max(0, CurrentHealth);
         EmitSignal(SignalName.HealthChanged, CurrentHealth, MaxHealth);
 
-        if (_sprite != null)
+        // Flash effect
+        if (!_isFlashing)
         {
-            _sprite.Modulate = new Color(1, 0.5f, 0.5f);
-            GetTree().CreateTimer(0.1).Timeout += () =>
-            {
-                if (_sprite != null)
-                {
-                    _sprite.Modulate = Colors.White;
-                }
-            };
+            FlashDamage();
         }
 
         if (CurrentHealth <= 0)
         {
             Die();
+        }
+    }
+
+    private async void FlashDamage()
+    {
+        _isFlashing = true;
+        var flashColor = new Color(1, 0.3f, 0.3f);
+        var normalColor = Colors.White;
+        int flashCount = 3;
+        float flashDuration = 0.08f;
+
+        for (int i = 0; i < flashCount; i++)
+        {
+            SetVisualColor(flashColor);
+            await ToSignal(GetTree().CreateTimer(flashDuration), SceneTreeTimer.SignalName.Timeout);
+
+            if (!IsInstanceValid(this)) return;
+
+            SetVisualColor(normalColor);
+            await ToSignal(GetTree().CreateTimer(flashDuration), SceneTreeTimer.SignalName.Timeout);
+
+            if (!IsInstanceValid(this)) return;
+        }
+
+        _isFlashing = false;
+    }
+
+    private void SetVisualColor(Color color)
+    {
+        if (_sprite != null)
+        {
+            _sprite.Modulate = color;
+        }
+        if (_placeholder != null)
+        {
+            _placeholder.Modulate = color;
         }
     }
 
