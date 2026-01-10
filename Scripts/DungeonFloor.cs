@@ -1094,4 +1094,18 @@ public partial class DungeonFloor : Node2D
     {
         return _rooms.Count > 0 ? _rooms[0] : null;
     }
+
+    public bool IsWall(int x, int y)
+    {
+        if (x < 0 || x >= MapWidth || y < 0 || y >= MapHeight)
+            return true;
+        return _map[x, y] == 1;
+    }
+
+    public bool IsFloor(int x, int y)
+    {
+        if (x < 0 || x >= MapWidth || y < 0 || y >= MapHeight)
+            return false;
+        return _map[x, y] == 0;
+    }
 }

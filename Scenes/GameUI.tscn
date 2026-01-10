@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://c3k5m7n9p1q3s"]
+[gd_scene load_steps=3 format=3 uid="uid://c3k5m7n9p1q3s"]
 
 [ext_resource type="Script" path="res://Scripts/GameUI.cs" id="1_gameui"]
+[ext_resource type="Script" path="res://Scripts/Minimap.cs" id="2_minimap"]
 
 [node name="GameUI" type="CanvasLayer"]
 script = ExtResource("1_gameui")
@@ -125,18 +126,18 @@ offset_bottom = 130.0
 text = "Floor B1"
 
 [node name="Controls" type="Label" parent="."]
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -200.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = 120.0
-grow_horizontal = 0
-text = "WASD - Move
-Left Click - Attack/Open Door
-Right Click - Skill"
-horizontal_alignment = 2
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -80.0
+offset_right = 250.0
+offset_bottom = -10.0
+grow_vertical = 0
+text = "WASD/Stick - Move
+Y/Click - Attack
+B/RClick - Skill"
+horizontal_alignment = 0
 
 [node name="GameOverPanel" type="Panel" parent="."]
 visible = false
@@ -195,6 +196,15 @@ anchor_bottom = 1.0
 text = "Level Up!"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="Minimap" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_minimap")
 
 [connection signal="pressed" from="GameOverPanel/VBoxContainer/RestartButton" to="." method="OnRestartButtonPressed"]
 [connection signal="pressed" from="GameOverPanel/VBoxContainer/QuitButton" to="." method="OnQuitButtonPressed"]
