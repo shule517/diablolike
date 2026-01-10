@@ -170,13 +170,16 @@ public partial class Enemy : CharacterBody2D
 		_target.TakeDamage(AttackDamage);
 	}
 
-	public void TakeDamage(int damage)
+	public void TakeDamage(int damage, bool isCritical = false)
 	{
 		if (_isDead)
 			return;
 
 		CurrentHealth -= damage;
 		UpdateHealthBar();
+
+		// Show damage number
+		ShowDamageNumber(damage, isCritical);
 
 		// Flash effect
 		if (!_isFlashing)
@@ -196,6 +199,37 @@ public partial class Enemy : CharacterBody2D
 		{
 			Die();
 		}
+	}
+
+	private void ShowDamageNumber(int damage, bool isCritical)
+	{
+		var damageLabel = new Label();
+		damageLabel.Text = damage.ToString();
+		damageLabel.HorizontalAlignment = HorizontalAlignment.Center;
+
+		if (isCritical)
+		{
+			damageLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.8f, 0.0f));
+			damageLabel.AddThemeFontSizeOverride("font_size", 32);
+		}
+		else
+		{
+			damageLabel.AddThemeColorOverride("font_color", new Color(1.0f, 1.0f, 1.0f));
+			damageLabel.AddThemeFontSizeOverride("font_size", 24);
+		}
+
+		// Random horizontal offset for variety
+		var random = new RandomNumberGenerator();
+		random.Randomize();
+		float offsetX = random.RandfRange(-20, 20);
+
+		damageLabel.GlobalPosition = GlobalPosition + new Vector2(offsetX - 20, -40);
+		GetParent().AddChild(damageLabel);
+
+		var tween = damageLabel.CreateTween();
+		tween.TweenProperty(damageLabel, "global_position:y", damageLabel.GlobalPosition.Y - 50, 0.6f);
+		tween.Parallel().TweenProperty(damageLabel, "modulate:a", 0.0f, 0.6f);
+		tween.TweenCallback(Callable.From(() => damageLabel.QueueFree()));
 	}
 
 	private async void FlashDamage()

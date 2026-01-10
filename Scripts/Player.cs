@@ -274,7 +274,7 @@ public partial class Player : CharacterBody2D
 		{
 			if (body is Enemy enemy)
 			{
-				enemy.TakeDamage(SkillDamage);
+				enemy.TakeDamage(SkillDamage, false);
 			}
 		};
 
@@ -293,25 +293,9 @@ public partial class Player : CharacterBody2D
 			if (isCritical)
 			{
 				damage = (int)(damage * 1.5f);
-				ShowCriticalEffect();
 			}
-			enemy.TakeDamage(damage);
+			enemy.TakeDamage(damage, isCritical);
 		}
-	}
-
-	private void ShowCriticalEffect()
-	{
-		var critLabel = new Label();
-		critLabel.Text = "CRITICAL!";
-		critLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.8f, 0.0f));
-		critLabel.AddThemeFontSizeOverride("font_size", 28);
-		critLabel.GlobalPosition = GlobalPosition + new Vector2(-50, -60);
-		GetParent().AddChild(critLabel);
-
-		var tween = critLabel.CreateTween();
-		tween.TweenProperty(critLabel, "position:y", critLabel.Position.Y - 40, 0.5f);
-		tween.Parallel().TweenProperty(critLabel, "modulate:a", 0.0f, 0.5f);
-		tween.TweenCallback(Callable.From(() => critLabel.QueueFree()));
 	}
 
 	public void TakeDamage(int damage)
