@@ -4,9 +4,10 @@ using System.Collections.Generic;
 
 public partial class Minimap : Control
 {
-	[Export] public int TileSize = 4; // Size of each tile on minimap (smaller = more tiles visible)
+	[Export] public int TileSize = 12; // Size of each tile on minimap
 	[Export] public float RevealRadius = 20.0f; // Tiles revealed around player
-	[Export] public int ViewRadius = 100; // How many tiles to show around player
+	[Export] public int ViewRadius = 60; // How many tiles to show around player
+	[Export] public int SampleRate = 4; // Only draw every Nth tile
 
 	private Image? _mapImage;
 	private ImageTexture? _mapTexture;
@@ -21,18 +22,15 @@ public partial class Minimap : Control
 	private Vector2I _lastPlayerTile = new Vector2I(-1, -1);
 	private float _updateTimer = 0;
 	private const float UPDATE_INTERVAL = 0.05f;
+	private Vector2 _smoothPlayerPos = Vector2.Zero;
 	private int _minimapDisplayWidth;
 	private int _minimapDisplayHeight;
 
-	// Isometric constants
-	private const float ISO_SCALE = 0.707f; // cos(45°)
-	private const float ISO_HEIGHT_RATIO = 0.5f; // Vertical compression for isometric
-
 	private Color _transparentColor = new Color(0, 0, 0, 0);
-	private Color _wallOutlineColor = new Color(0.8f, 0.7f, 0.6f, 0.85f);
-	private Color _floorColor = new Color(0.3f, 0.25f, 0.2f, 0.4f); // Floor fill color
-	private Color _playerColor = new Color(0.3f, 1.0f, 0.3f, 1.0f);
-	private Color _enemyColor = new Color(1.0f, 0.3f, 0.3f, 1.0f);
+	private Color _caretColor = new Color(0.8f, 0.75f, 0.6f, 0.9f);
+	private Color _playerColor = new Color(0.3f, 0.9f, 0.3f, 1.0f);
+	private Color _portalColor = new Color(0.4f, 0.6f, 1.0f, 1.0f);
+	private Color _floorDotColor = new Color(0.5f, 0.45f, 0.4f, 0.4f);
 
 	private bool _isInitialized = false;
 
@@ -47,9 +45,9 @@ public partial class Minimap : Control
 		SetAnchorsPreset(LayoutPreset.FullRect);
 		MouseFilter = MouseFilterEnum.Ignore;
 
-		// Create semi-transparent background
+		// Create very subtle background
 		_background = new ColorRect();
-		_background.Color = new Color(0, 0, 0, 0.5f);
+		_background.Color = new Color(0, 0, 0, 0.15f);
 		_background.MouseFilter = MouseFilterEnum.Ignore;
 		AddChild(_background);
 
@@ -124,12 +122,18 @@ public partial class Minimap : Control
 		_explored = new bool[_mapWidth, _mapHeight];
 		_lastPlayerTile = new Vector2I(-1, -1);
 
+		// Initialize smooth position
+		if (_player != null)
+		{
+			_smoothPlayerPos = _player.GlobalPosition / _dungeonTileSize;
+		}
+
 		// Get viewport size
 		var viewportSize = GetViewport().GetVisibleRect().Size;
 
-		// Minimap display size - fit to left side of screen
-		_minimapDisplayWidth = (int)(viewportSize.X * 0.35f); // 35% of screen width
-		_minimapDisplayHeight = (int)(viewportSize.Y * 0.6f); // 60% of screen height
+		// Minimap display size - larger area
+		_minimapDisplayWidth = (int)(viewportSize.X * 0.6f); // 60% of screen width
+		_minimapDisplayHeight = (int)(viewportSize.Y * 0.8f); // 80% of screen height
 
 		// Create map image for the minimap
 		// Image needs to be large enough for isometric rendering
@@ -158,14 +162,6 @@ public partial class Minimap : Control
 		_isInitialized = true;
 	}
 
-	// Convert world tile offset to isometric screen position
-	private Vector2I ToIsometric(int dx, int dy)
-	{
-		// Isometric transformation: rotate 45 degrees and compress vertically
-		float isoX = (dx - dy) * TileSize * ISO_SCALE;
-		float isoY = (dx + dy) * TileSize * ISO_SCALE * ISO_HEIGHT_RATIO;
-		return new Vector2I((int)isoX, (int)isoY);
-	}
 
 	public override void _Process(double delta)
 	{
@@ -177,6 +173,10 @@ public partial class Minimap : Control
 		// Get player tile position
 		Vector2I playerTile = WorldToTile(_player.GlobalPosition);
 
+		// Smooth player position for minimap (lerp for smooth scrolling)
+		Vector2 targetPos = _player.GlobalPosition / _dungeonTileSize;
+		_smoothPlayerPos = _smoothPlayerPos.Lerp(targetPos, (float)delta * 10.0f);
+
 		// Only update when player moves to a new tile or timer expires
 		bool playerMoved = playerTile != _lastPlayerTile;
 
@@ -187,12 +187,8 @@ public partial class Minimap : Control
 			_lastPlayerTile = playerTile;
 		}
 
-		// Update map texture periodically (for enemies) or when player moves
-		if (playerMoved || _updateTimer >= UPDATE_INTERVAL)
-		{
-			UpdateMapTexture(playerTile);
-			_updateTimer = 0;
-		}
+		// Update map texture every frame for smooth scrolling
+		UpdateMapTexture(_smoothPlayerPos);
 	}
 
 	private Vector2I WorldToTile(Vector2 worldPos)
@@ -228,7 +224,7 @@ public partial class Minimap : Control
 		}
 	}
 
-	private void UpdateMapTexture(Vector2I playerTile)
+	private void UpdateMapTexture(Vector2 playerPos)
 	{
 		if (_mapImage == null || _mapTexture == null || _dungeonFloor == null)
 			return;
@@ -239,71 +235,80 @@ public partial class Minimap : Control
 		int imageCenterX = _mapImage.GetWidth() / 2;
 		int imageCenterY = _mapImage.GetHeight() / 2;
 
-		// Scan all explored tiles (not just around player)
-		for (int worldX = 0; worldX < _mapWidth; worldX++)
+		// Scan explored tiles - draw pixel art style
+		for (int worldX = 0; worldX < _mapWidth; worldX += SampleRate)
 		{
-			for (int worldY = 0; worldY < _mapHeight; worldY++)
+			for (int worldY = 0; worldY < _mapHeight; worldY += SampleRate)
 			{
-				if (!_explored![worldX, worldY]) continue;
+				// Check sample area
+				bool hasFloor = false;
+				bool hasWallEdge = false;
 
-				int dx = worldX - playerTile.X;
-				int dy = worldY - playerTile.Y;
-
-				// Convert to isometric coordinates
-				Vector2I isoPos = ToIsometric(dx, dy);
-				int screenX = imageCenterX + isoPos.X;
-				int screenY = imageCenterY + isoPos.Y;
-
-				// Draw floor tiles as isometric diamonds
-				if (_dungeonFloor.IsFloor(worldX, worldY))
+				for (int sx = 0; sx < SampleRate; sx++)
 				{
-					DrawIsometricTile(screenX, screenY, _floorColor);
+					for (int sy = 0; sy < SampleRate; sy++)
+					{
+						int checkX = worldX + sx;
+						int checkY = worldY + sy;
+						if (checkX >= _mapWidth || checkY >= _mapHeight) continue;
+						if (!_explored![checkX, checkY]) continue;
 
-					// Draw wall edges on the isometric tile
-					// Top-left edge (was top edge in normal view)
-					if (worldY > 0 && _dungeonFloor.IsWall(worldX, worldY - 1))
-					{
-						DrawIsometricEdgeTopLeft(screenX, screenY, _wallOutlineColor);
+						if (_dungeonFloor.IsFloor(checkX, checkY))
+						{
+							hasFloor = true;
+							// Check if this floor is adjacent to wall
+							if ((checkY > 0 && _dungeonFloor.IsWall(checkX, checkY - 1)) ||
+								(checkY < _mapHeight - 1 && _dungeonFloor.IsWall(checkX, checkY + 1)) ||
+								(checkX > 0 && _dungeonFloor.IsWall(checkX - 1, checkY)) ||
+								(checkX < _mapWidth - 1 && _dungeonFloor.IsWall(checkX + 1, checkY)))
+							{
+								hasWallEdge = true;
+							}
+						}
 					}
-					// Bottom-right edge (was bottom edge)
-					if (worldY < _mapHeight - 1 && _dungeonFloor.IsWall(worldX, worldY + 1))
+				}
+
+				if (!hasFloor) continue;
+
+				// Use smooth float position for smooth scrolling
+				float dx = worldX - playerPos.X;
+				float dy = worldY - playerPos.Y;
+				int screenX = imageCenterX + (int)(dx * TileSize / SampleRate);
+				int screenY = imageCenterY + (int)(dy * TileSize / SampleRate);
+
+				if (hasWallEdge)
+				{
+					// Draw wall edge - use world position for consistent pattern
+					DrawPixelArt(screenX, screenY, _caretColor, worldX, worldY);
+				}
+				else
+				{
+					// Draw floor as dim pixel (sparse)
+					if ((worldX + worldY) % 4 == 0)
 					{
-						DrawIsometricEdgeBottomRight(screenX, screenY, _wallOutlineColor);
-					}
-					// Top-right edge (was left edge)
-					if (worldX > 0 && _dungeonFloor.IsWall(worldX - 1, worldY))
-					{
-						DrawIsometricEdgeTopRight(screenX, screenY, _wallOutlineColor);
-					}
-					// Bottom-left edge (was right edge)
-					if (worldX < _mapWidth - 1 && _dungeonFloor.IsWall(worldX + 1, worldY))
-					{
-						DrawIsometricEdgeBottomLeft(screenX, screenY, _wallOutlineColor);
+						DrawPixelArt(screenX, screenY, _floorDotColor, worldX, worldY);
 					}
 				}
 			}
 		}
 
-		// Draw enemies on minimap (only in explored areas)
-		var enemies = GetTree().GetNodesInGroup("enemies");
-		foreach (var enemy in enemies)
+		// Draw portal/stairs on minimap
+		var portals = GetTree().GetNodesInGroup("town_portal");
+		foreach (var portal in portals)
 		{
-			if (enemy is Enemy e && IsInstanceValid(e))
+			if (portal is Node2D p && IsInstanceValid(p))
 			{
-				Vector2I enemyTile = WorldToTile(e.GlobalPosition);
+				Vector2I portalTile = WorldToTile(p.GlobalPosition);
 
-				if (enemyTile.X >= 0 && enemyTile.X < _mapWidth &&
-					enemyTile.Y >= 0 && enemyTile.Y < _mapHeight &&
-					_explored![enemyTile.X, enemyTile.Y])
+				if (portalTile.X >= 0 && portalTile.X < _mapWidth &&
+					portalTile.Y >= 0 && portalTile.Y < _mapHeight &&
+					_explored![portalTile.X, portalTile.Y])
 				{
-					int dx = enemyTile.X - playerTile.X;
-					int dy = enemyTile.Y - playerTile.Y;
-
-					// Show enemies in all explored areas
-					Vector2I isoPos = ToIsometric(dx, dy);
-					int screenX = imageCenterX + isoPos.X;
-					int screenY = imageCenterY + isoPos.Y;
-					DrawDotAt(screenX, screenY, _enemyColor, 2);
+					float dx = portalTile.X - playerPos.X;
+					float dy = portalTile.Y - playerPos.Y;
+					int screenX = imageCenterX + (int)(dx * TileSize / SampleRate);
+					int screenY = imageCenterY + (int)(dy * TileSize / SampleRate);
+					DrawDotAt(screenX, screenY, _portalColor, 6);
 				}
 			}
 		}
@@ -315,97 +320,88 @@ public partial class Minimap : Control
 		_mapTexture.Update(_mapImage);
 	}
 
-	private void DrawIsometricTile(int centerX, int centerY, Color color)
-	{
-		if (_mapImage == null) return;
-
-		// Draw a diamond shape for isometric tile
-		int halfWidth = (int)(TileSize * ISO_SCALE);
-		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
-
-		for (int y = -halfHeight; y <= halfHeight; y++)
-		{
-			// Calculate width at this height (diamond shape)
-			float ratio = 1.0f - Math.Abs(y) / (float)halfHeight;
-			int width = (int)(halfWidth * ratio);
-
-			for (int x = -width; x <= width; x++)
-			{
-				SetPixelSafe(centerX + x, centerY + y, color);
-			}
-		}
-	}
-
-	private void DrawIsometricEdgeTopLeft(int centerX, int centerY, Color color)
-	{
-		if (_mapImage == null) return;
-		int halfWidth = (int)(TileSize * ISO_SCALE);
-		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
-
-		// Draw line from top to left corner
-		for (int i = 0; i <= halfWidth; i++)
-		{
-			int x = centerX - i;
-			int y = centerY - halfHeight + (int)(i * ISO_HEIGHT_RATIO);
-			SetPixelSafe(x, y, color);
-			SetPixelSafe(x, y + 1, color);
-		}
-	}
-
-	private void DrawIsometricEdgeTopRight(int centerX, int centerY, Color color)
-	{
-		if (_mapImage == null) return;
-		int halfWidth = (int)(TileSize * ISO_SCALE);
-		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
-
-		// Draw line from top to right corner
-		for (int i = 0; i <= halfWidth; i++)
-		{
-			int x = centerX + i;
-			int y = centerY - halfHeight + (int)(i * ISO_HEIGHT_RATIO);
-			SetPixelSafe(x, y, color);
-			SetPixelSafe(x, y + 1, color);
-		}
-	}
-
-	private void DrawIsometricEdgeBottomLeft(int centerX, int centerY, Color color)
-	{
-		if (_mapImage == null) return;
-		int halfWidth = (int)(TileSize * ISO_SCALE);
-		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
-
-		// Draw line from left corner to bottom
-		for (int i = 0; i <= halfWidth; i++)
-		{
-			int x = centerX - halfWidth + i;
-			int y = centerY + (int)(i * ISO_HEIGHT_RATIO);
-			SetPixelSafe(x, y, color);
-			SetPixelSafe(x, y - 1, color);
-		}
-	}
-
-	private void DrawIsometricEdgeBottomRight(int centerX, int centerY, Color color)
-	{
-		if (_mapImage == null) return;
-		int halfWidth = (int)(TileSize * ISO_SCALE);
-		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
-
-		// Draw line from right corner to bottom
-		for (int i = 0; i <= halfWidth; i++)
-		{
-			int x = centerX + halfWidth - i;
-			int y = centerY + (int)(i * ISO_HEIGHT_RATIO);
-			SetPixelSafe(x, y, color);
-			SetPixelSafe(x, y - 1, color);
-		}
-	}
-
 	private void SetPixelSafe(int x, int y, Color color)
 	{
 		if (_mapImage == null) return;
 		if (x >= 0 && x < _mapImage.GetWidth() && y >= 0 && y < _mapImage.GetHeight())
 		{
 			_mapImage.SetPixel(x, y, color);
+		}
+	}
+
+	// Draw Tetris block patterns for AA-style minimap
+	private void DrawTetrisBlock(int x, int y, Color color, int blockType)
+	{
+		int s = 2; // block unit size
+
+		switch (blockType % 7)
+		{
+			case 0: // I block (horizontal) ████
+				for (int i = 0; i < 4; i++)
+					DrawBlock(x + i * s, y, s, color);
+				break;
+
+			case 1: // O block (square) ██
+				//                      ██
+				DrawBlock(x, y, s, color);
+				DrawBlock(x + s, y, s, color);
+				DrawBlock(x, y + s, s, color);
+				DrawBlock(x + s, y + s, s, color);
+				break;
+
+			case 2: // T block  ███
+				//              █
+				DrawBlock(x, y, s, color);
+				DrawBlock(x + s, y, s, color);
+				DrawBlock(x + s * 2, y, s, color);
+				DrawBlock(x + s, y + s, s, color);
+				break;
+
+			case 3: // S block   ██
+				//             ██
+				DrawBlock(x + s, y, s, color);
+				DrawBlock(x + s * 2, y, s, color);
+				DrawBlock(x, y + s, s, color);
+				DrawBlock(x + s, y + s, s, color);
+				break;
+
+			case 4: // Z block  ██
+				//               ██
+				DrawBlock(x, y, s, color);
+				DrawBlock(x + s, y, s, color);
+				DrawBlock(x + s, y + s, s, color);
+				DrawBlock(x + s * 2, y + s, s, color);
+				break;
+
+			case 5: // L block  █
+				//              █
+				//              ██
+				DrawBlock(x, y, s, color);
+				DrawBlock(x, y + s, s, color);
+				DrawBlock(x, y + s * 2, s, color);
+				DrawBlock(x + s, y + s * 2, s, color);
+				break;
+
+			case 6: // J block   █
+				//               █
+				//              ██
+				DrawBlock(x + s, y, s, color);
+				DrawBlock(x + s, y + s, s, color);
+				DrawBlock(x, y + s * 2, s, color);
+				DrawBlock(x + s, y + s * 2, s, color);
+				break;
+		}
+	}
+
+	// Draw a horizontal block (width x 2 height)
+	private void DrawBlock(int x, int y, int width, Color color)
+	{
+		for (int dx = 0; dx < width; dx++)
+		{
+			for (int dy = 0; dy < 2; dy++)
+			{
+				SetPixelSafe(x + dx, y + dy, color);
+			}
 		}
 	}
 
@@ -429,5 +425,25 @@ public partial class Minimap : Control
 				}
 			}
 		}
+	}
+
+	// Draw pixel art piece (mountain style, 2 colors only: light and dark)
+	private void DrawPixelArt(int x, int y, Color color, int worldX, int worldY)
+	{
+		// Only 2 brightness levels
+		Color lightColor = color;
+		Color darkColor = new Color(color.R * 0.5f, color.G * 0.5f, color.B * 0.5f, color.A);
+
+		// Mountain/pyramid piece only
+		//     ##
+		//   ######
+		//  ########
+		// ##########
+		// Top 3 rows (light)
+		DrawBlock(x + 4, y, 2, lightColor);
+		DrawBlock(x + 2, y + 2, 6, lightColor);
+		DrawBlock(x + 1, y + 4, 8, lightColor);
+		// Bottom row (dark)
+		DrawBlock(x, y + 6, 10, darkColor);
 	}
 }
