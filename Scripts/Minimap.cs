@@ -4,9 +4,9 @@ using System.Collections.Generic;
 
 public partial class Minimap : Control
 {
-	[Export] public int TileSize = 8; // Size of each tile on minimap
-	[Export] public float RevealRadius = 10.0f; // Tiles revealed around player
-	[Export] public int ViewRadius = 40; // How many tiles to show around player
+	[Export] public int TileSize = 4; // Size of each tile on minimap (smaller = more tiles visible)
+	[Export] public float RevealRadius = 20.0f; // Tiles revealed around player
+	[Export] public int ViewRadius = 100; // How many tiles to show around player
 
 	private Image? _mapImage;
 	private ImageTexture? _mapTexture;
@@ -21,6 +21,8 @@ public partial class Minimap : Control
 	private Vector2I _lastPlayerTile = new Vector2I(-1, -1);
 	private float _updateTimer = 0;
 	private const float UPDATE_INTERVAL = 0.05f;
+	private int _minimapDisplayWidth;
+	private int _minimapDisplayHeight;
 
 	// Isometric constants
 	private const float ISO_SCALE = 0.707f; // cos(45°)
@@ -34,23 +36,27 @@ public partial class Minimap : Control
 
 	private bool _isInitialized = false;
 
+	private ColorRect? _background;
+
 	public override void _Ready()
 	{
 		// Start hidden (will show when entering dungeon)
 		Visible = false;
 
-		// Get viewport size for full-screen overlay
-		var viewportSize = GetViewport().GetVisibleRect().Size;
+		// Set up minimap container
+		SetAnchorsPreset(LayoutPreset.FullRect);
+		MouseFilter = MouseFilterEnum.Ignore;
 
-		// Set up minimap to cover most of the screen
-		CustomMinimumSize = viewportSize;
-		Size = viewportSize;
+		// Create semi-transparent background
+		_background = new ColorRect();
+		_background.Color = new Color(0, 0, 0, 0.5f);
+		_background.MouseFilter = MouseFilterEnum.Ignore;
+		AddChild(_background);
 
-		// Create minimap display - centered on screen
+		// Create minimap display
 		_minimapDisplay = new TextureRect();
-		_minimapDisplay.Size = viewportSize;
-		_minimapDisplay.Position = Vector2.Zero;
-		_minimapDisplay.StretchMode = TextureRect.StretchModeEnum.KeepCentered;
+		_minimapDisplay.StretchMode = TextureRect.StretchModeEnum.KeepAspect;
+		_minimapDisplay.MouseFilter = MouseFilterEnum.Ignore;
 		AddChild(_minimapDisplay);
 
 		// Find player
@@ -118,14 +124,36 @@ public partial class Minimap : Control
 		_explored = new bool[_mapWidth, _mapHeight];
 		_lastPlayerTile = new Vector2I(-1, -1);
 
-		// Create map image - larger for isometric view (diamond shape needs more width)
-		int imageWidth = (int)(ViewRadius * 3 * TileSize);
-		int imageHeight = (int)(ViewRadius * 2 * TileSize);
+		// Get viewport size
+		var viewportSize = GetViewport().GetVisibleRect().Size;
+
+		// Minimap display size - fit to left side of screen
+		_minimapDisplayWidth = (int)(viewportSize.X * 0.35f); // 35% of screen width
+		_minimapDisplayHeight = (int)(viewportSize.Y * 0.6f); // 60% of screen height
+
+		// Create map image for the minimap
+		// Image needs to be large enough for isometric rendering
+		int imageWidth = _minimapDisplayWidth * 2;
+		int imageHeight = _minimapDisplayHeight * 2;
 		_mapImage = Image.CreateEmpty(imageWidth, imageHeight, false, Image.Format.Rgba8);
 		_mapImage.Fill(_transparentColor);
 
 		_mapTexture = ImageTexture.CreateFromImage(_mapImage);
 		_minimapDisplay!.Texture = _mapTexture;
+
+		// Position minimap at left side of screen, vertically centered
+		float leftMargin = 10;
+		float topPosition = (viewportSize.Y - _minimapDisplayHeight) / 2;
+
+		_minimapDisplay.Size = new Vector2(_minimapDisplayWidth, _minimapDisplayHeight);
+		_minimapDisplay.Position = new Vector2(leftMargin, topPosition);
+
+		// Position background behind minimap
+		if (_background != null)
+		{
+			_background.Size = new Vector2(_minimapDisplayWidth + 10, _minimapDisplayHeight + 10);
+			_background.Position = new Vector2(leftMargin - 5, topPosition - 5);
+		}
 
 		_isInitialized = true;
 	}
@@ -211,21 +239,15 @@ public partial class Minimap : Control
 		int imageCenterX = _mapImage.GetWidth() / 2;
 		int imageCenterY = _mapImage.GetHeight() / 2;
 
-		// Expand scan range to fill rectangular screen area in isometric view
-		int scanRadius = (int)(ViewRadius * 1.5f);
-
-		// Draw floor tiles and wall outlines in isometric view
-		for (int dx = -scanRadius; dx < scanRadius; dx++)
+		// Scan all explored tiles (not just around player)
+		for (int worldX = 0; worldX < _mapWidth; worldX++)
 		{
-			for (int dy = -scanRadius; dy < scanRadius; dy++)
+			for (int worldY = 0; worldY < _mapHeight; worldY++)
 			{
-				int worldX = playerTile.X + dx;
-				int worldY = playerTile.Y + dy;
-
-				if (worldX < 0 || worldX >= _mapWidth || worldY < 0 || worldY >= _mapHeight)
-					continue;
-
 				if (!_explored![worldX, worldY]) continue;
+
+				int dx = worldX - playerTile.X;
+				int dy = worldY - playerTile.Y;
 
 				// Convert to isometric coordinates
 				Vector2I isoPos = ToIsometric(dx, dy);
@@ -262,29 +284,26 @@ public partial class Minimap : Control
 			}
 		}
 
-		// Draw enemies on minimap (only in explored areas and within view)
+		// Draw enemies on minimap (only in explored areas)
 		var enemies = GetTree().GetNodesInGroup("enemies");
 		foreach (var enemy in enemies)
 		{
 			if (enemy is Enemy e && IsInstanceValid(e))
 			{
 				Vector2I enemyTile = WorldToTile(e.GlobalPosition);
-				int dx = enemyTile.X - playerTile.X;
-				int dy = enemyTile.Y - playerTile.Y;
 
-				if (Math.Abs(dx) < scanRadius && Math.Abs(dy) < scanRadius &&
-					enemyTile.X >= 0 && enemyTile.X < _mapWidth &&
+				if (enemyTile.X >= 0 && enemyTile.X < _mapWidth &&
 					enemyTile.Y >= 0 && enemyTile.Y < _mapHeight &&
 					_explored![enemyTile.X, enemyTile.Y])
 				{
-					// Check if enemy is within player's visible range
-					if (Math.Abs(dx) <= RevealRadius && Math.Abs(dy) <= RevealRadius)
-					{
-						Vector2I isoPos = ToIsometric(dx, dy);
-						int screenX = imageCenterX + isoPos.X;
-						int screenY = imageCenterY + isoPos.Y;
-						DrawDotAt(screenX, screenY, _enemyColor, 3);
-					}
+					int dx = enemyTile.X - playerTile.X;
+					int dy = enemyTile.Y - playerTile.Y;
+
+					// Show enemies in all explored areas
+					Vector2I isoPos = ToIsometric(dx, dy);
+					int screenX = imageCenterX + isoPos.X;
+					int screenY = imageCenterY + isoPos.Y;
+					DrawDotAt(screenX, screenY, _enemyColor, 2);
 				}
 			}
 		}
