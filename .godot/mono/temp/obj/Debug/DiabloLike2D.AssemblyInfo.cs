@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DiabloLike2D")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c3fdf13186ede9875dcc3b022caa9b2044871f1b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c560e3aa5bda136c952e9a0b413d22d8bad6d417")]
 [assembly: System.Reflection.AssemblyProductAttribute("DiabloLike2D")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DiabloLike2D")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

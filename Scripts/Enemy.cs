@@ -21,6 +21,8 @@ public partial class Enemy : CharacterBody2D
 	private ColorRect? _placeholder;
 	private bool _isDead = false;
 	private bool _isFlashing = false;
+	private bool _isAttacking = false;
+	private Node2D? _attackIndicator;
 
 	private enum State
 	{
@@ -160,14 +162,118 @@ public partial class Enemy : CharacterBody2D
 
 	private void ProcessAttack()
 	{
-		if (_target == null || _attackTimer > 0)
+		if (_target == null || _attackTimer > 0 || _isAttacking)
 			return;
 
+		_isAttacking = true;
 		_attackTimer = AttackCooldown;
 		PlayAnimation("attack");
 
-		// Deal damage to player
-		_target.TakeDamage(AttackDamage);
+		// Show attack indicator before dealing damage
+		ShowAttackIndicator();
+	}
+
+	private void ShowAttackIndicator()
+	{
+		if (_target == null) return;
+
+		// Create attack indicator pointing at player
+		_attackIndicator = new Node2D();
+		_attackIndicator.GlobalPosition = GlobalPosition;
+
+		// Warning circle around enemy
+		var warningCircle = new Polygon2D();
+		var circlePoints = new Vector2[32];
+		for (int i = 0; i < 32; i++)
+		{
+			float angle = Mathf.Tau * i / 32.0f;
+			circlePoints[i] = new Vector2(Mathf.Cos(angle) * AttackRange, Mathf.Sin(angle) * AttackRange);
+		}
+		warningCircle.Polygon = circlePoints;
+		warningCircle.Color = new Color(1.0f, 0.2f, 0.1f, 0.3f);
+		_attackIndicator.AddChild(warningCircle);
+
+		// Direction line to player
+		var directionLine = new Line2D();
+		Vector2 dirToPlayer = (_target.GlobalPosition - GlobalPosition).Normalized() * AttackRange;
+		directionLine.AddPoint(Vector2.Zero);
+		directionLine.AddPoint(dirToPlayer);
+		directionLine.Width = 3.0f;
+		directionLine.DefaultColor = new Color(1.0f, 0.3f, 0.1f, 0.8f);
+		_attackIndicator.AddChild(directionLine);
+
+		// Attack point indicator
+		var attackPoint = new Polygon2D();
+		var pointCircle = new Vector2[16];
+		for (int i = 0; i < 16; i++)
+		{
+			float angle = Mathf.Tau * i / 16.0f;
+			pointCircle[i] = dirToPlayer + new Vector2(Mathf.Cos(angle) * 8, Mathf.Sin(angle) * 8);
+		}
+		attackPoint.Polygon = pointCircle;
+		attackPoint.Color = new Color(1.0f, 0.1f, 0.0f, 0.6f);
+		_attackIndicator.AddChild(attackPoint);
+
+		GetParent().AddChild(_attackIndicator);
+
+		// Flash the indicator and then attack
+		var tween = _attackIndicator.CreateTween();
+		tween.TweenProperty(warningCircle, "color:a", 0.6f, 0.15f);
+		tween.TweenProperty(warningCircle, "color:a", 0.2f, 0.15f);
+		tween.TweenCallback(Callable.From(() => ExecuteAttack()));
+	}
+
+	private void ExecuteAttack()
+	{
+		// Remove indicator
+		if (_attackIndicator != null && IsInstanceValid(_attackIndicator))
+		{
+			_attackIndicator.QueueFree();
+			_attackIndicator = null;
+		}
+
+		// Check if player is still in range and deal damage
+		if (_target != null && IsInstanceValid(_target))
+		{
+			float distanceToPlayer = GlobalPosition.DistanceTo(_target.GlobalPosition);
+			if (distanceToPlayer <= AttackRange * 1.2f) // Small grace margin
+			{
+				_target.TakeDamage(AttackDamage);
+				ShowAttackEffect();
+			}
+		}
+
+		_isAttacking = false;
+	}
+
+	private void ShowAttackEffect()
+	{
+		if (_target == null) return;
+
+		// Create attack slash effect
+		var effect = new Polygon2D();
+		var points = new Vector2[12];
+		Vector2 dir = (_target.GlobalPosition - GlobalPosition).Normalized();
+		float startAngle = dir.Angle() - Mathf.Pi / 6;
+		float endAngle = dir.Angle() + Mathf.Pi / 6;
+
+		points[0] = Vector2.Zero;
+		for (int i = 0; i < 11; i++)
+		{
+			float angle = startAngle + (endAngle - startAngle) * i / 10.0f;
+			points[i + 1] = new Vector2(Mathf.Cos(angle) * AttackRange, Mathf.Sin(angle) * AttackRange);
+		}
+
+		effect.Polygon = points;
+		effect.Color = new Color(1.0f, 0.4f, 0.2f, 0.7f);
+		effect.GlobalPosition = GlobalPosition;
+
+		GetParent().AddChild(effect);
+
+		// Fade out
+		var tween = effect.CreateTween();
+		tween.TweenProperty(effect, "modulate:a", 0.0f, 0.2f);
+		tween.TweenCallback(Callable.From(() => effect.QueueFree()));
 	}
 
 	public void TakeDamage(int damage, bool isCritical = false)
@@ -281,6 +387,14 @@ public partial class Enemy : CharacterBody2D
 	{
 		_isDead = true;
 		_currentState = State.Dead;
+		_isAttacking = false;
+
+		// Clean up attack indicator if exists
+		if (_attackIndicator != null && IsInstanceValid(_attackIndicator))
+		{
+			_attackIndicator.QueueFree();
+			_attackIndicator = null;
+		}
 
 		// Give experience to player
 		if (_target != null && IsInstanceValid(_target))
