@@ -37,6 +37,9 @@ public partial class Player : CharacterBody2D
 	private float _attackTimer = 0.0f;
 	private bool _isAttacking = false;
 	private bool _isFlashing = false;
+	private bool _isStunned = false;
+	private float _stunTimer = 0.0f;
+	private const float STUN_DURATION = 0.25f; // Stun duration when hit
 	private AnimatedSprite2D? _sprite;
 	private Area2D? _attackArea;
 	private ColorRect? _placeholder;
@@ -86,6 +89,17 @@ public partial class Player : CharacterBody2D
 	public override void _PhysicsProcess(double delta)
 	{
 		if (_isDead) return;
+
+		// Update stun timer
+		if (_isStunned)
+		{
+			_stunTimer -= (float)delta;
+			if (_stunTimer <= 0)
+			{
+				_isStunned = false;
+			}
+			return; // Can't act while stunned
+		}
 
 		if (_attackTimer > 0)
 		{
@@ -307,6 +321,10 @@ public partial class Player : CharacterBody2D
 		CurrentHealth -= damage;
 		CurrentHealth = Math.Max(0, CurrentHealth);
 		EmitSignal(SignalName.HealthChanged, CurrentHealth, MaxHealth);
+
+		// Stun effect
+		_isStunned = true;
+		_stunTimer = STUN_DURATION;
 
 		// Flash effect
 		if (!_isFlashing)

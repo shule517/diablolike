@@ -25,6 +25,9 @@ public partial class Enemy : CharacterBody2D
 	private float _attackingTime = 0.0f;
 	private const float MAX_ATTACKING_TIME = 1.0f; // Safety timeout
 	private Node2D? _attackIndicator;
+	private bool _isStunned = false;
+	private float _stunTimer = 0.0f;
+	private const float STUN_DURATION = 0.3f; // Stun duration when hit
 
 	private enum State
 	{
@@ -69,6 +72,17 @@ public partial class Enemy : CharacterBody2D
 	{
 		if (_isDead)
 			return;
+
+		// Update stun timer
+		if (_isStunned)
+		{
+			_stunTimer -= (float)delta;
+			if (_stunTimer <= 0)
+			{
+				_isStunned = false;
+			}
+			return; // Can't act while stunned
+		}
 
 		if (_attackTimer > 0)
 		{
@@ -316,6 +330,10 @@ public partial class Enemy : CharacterBody2D
 
 		CurrentHealth -= damage;
 		UpdateHealthBar();
+
+		// Stun effect
+		_isStunned = true;
+		_stunTimer = STUN_DURATION;
 
 		// Show damage number
 		ShowDamageNumber(damage, isCritical);
