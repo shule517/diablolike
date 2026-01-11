@@ -3,7 +3,7 @@ using System;
 
 public partial class Player : CharacterBody2D
 {
-	[Export] public float BaseSpeed = 150.0f;
+	[Export] public float BaseSpeed = 170.0f;
 	[Export] public int BaseMaxHealth = 50;
 	[Export] public int BaseMaxMana = 30;
 	[Export] public int BaseAttackDamage = 5;
@@ -21,7 +21,7 @@ public partial class Player : CharacterBody2D
 	public int BonusAttackDamage { get; private set; } = 0; // Bonus from weapons/items
 
 	// Calculated stats
-	public float Speed => BaseSpeed + Agility * 5;
+	public float Speed => BaseSpeed; // AGI doesn't affect movement speed
 	public int MaxHealth => BaseMaxHealth + Vitality * 10;
 	public int MaxMana => BaseMaxMana + Intelligence * 5;
 	public int AttackDamage => BaseAttackDamage + Strength * 2 + BonusAttackDamage;
