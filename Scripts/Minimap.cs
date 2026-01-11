@@ -4,9 +4,9 @@ using System.Collections.Generic;
 
 public partial class Minimap : Control
 {
-	[Export] public int TileSize = 10; // Size of each tile on minimap (larger for visibility)
+	[Export] public int TileSize = 8; // Size of each tile on minimap
 	[Export] public float RevealRadius = 10.0f; // Tiles revealed around player
-	[Export] public int ViewRadius = 40; // How many tiles to show around player (adjusted for 64x64 map)
+	[Export] public int ViewRadius = 40; // How many tiles to show around player
 
 	private Image? _mapImage;
 	private ImageTexture? _mapTexture;
@@ -20,10 +20,15 @@ public partial class Minimap : Control
 	private int _dungeonTileSize;
 	private Vector2I _lastPlayerTile = new Vector2I(-1, -1);
 	private float _updateTimer = 0;
-	private const float UPDATE_INTERVAL = 0.05f; // Update more frequently
+	private const float UPDATE_INTERVAL = 0.05f;
+
+	// Isometric constants
+	private const float ISO_SCALE = 0.707f; // cos(45°)
+	private const float ISO_HEIGHT_RATIO = 0.5f; // Vertical compression for isometric
 
 	private Color _transparentColor = new Color(0, 0, 0, 0);
-	private Color _wallOutlineColor = new Color(0.8f, 0.7f, 0.6f, 0.85f); // Wall outline color
+	private Color _wallOutlineColor = new Color(0.8f, 0.7f, 0.6f, 0.85f);
+	private Color _floorColor = new Color(0.3f, 0.25f, 0.2f, 0.4f); // Floor fill color
 	private Color _playerColor = new Color(0.3f, 1.0f, 0.3f, 1.0f);
 	private Color _enemyColor = new Color(1.0f, 0.3f, 0.3f, 1.0f);
 
@@ -113,15 +118,25 @@ public partial class Minimap : Control
 		_explored = new bool[_mapWidth, _mapHeight];
 		_lastPlayerTile = new Vector2I(-1, -1);
 
-		// Create map image - size based on view radius (player-centered view)
-		int imageSize = ViewRadius * 2 * TileSize;
-		_mapImage = Image.CreateEmpty(imageSize, imageSize, false, Image.Format.Rgba8);
+		// Create map image - larger for isometric view (diamond shape needs more width)
+		int imageWidth = (int)(ViewRadius * 3 * TileSize);
+		int imageHeight = (int)(ViewRadius * 2 * TileSize);
+		_mapImage = Image.CreateEmpty(imageWidth, imageHeight, false, Image.Format.Rgba8);
 		_mapImage.Fill(_transparentColor);
 
 		_mapTexture = ImageTexture.CreateFromImage(_mapImage);
 		_minimapDisplay!.Texture = _mapTexture;
 
 		_isInitialized = true;
+	}
+
+	// Convert world tile offset to isometric screen position
+	private Vector2I ToIsometric(int dx, int dy)
+	{
+		// Isometric transformation: rotate 45 degrees and compress vertically
+		float isoX = (dx - dy) * TileSize * ISO_SCALE;
+		float isoY = (dx + dy) * TileSize * ISO_SCALE * ISO_HEIGHT_RATIO;
+		return new Vector2I((int)isoX, (int)isoY);
 	}
 
 	public override void _Process(double delta)
@@ -193,12 +208,16 @@ public partial class Minimap : Control
 		// Clear the image to transparent
 		_mapImage.Fill(_transparentColor);
 
-		int imageCenter = ViewRadius * TileSize;
+		int imageCenterX = _mapImage.GetWidth() / 2;
+		int imageCenterY = _mapImage.GetHeight() / 2;
 
-		// Draw wall outlines centered on player
-		for (int dx = -ViewRadius; dx < ViewRadius; dx++)
+		// Expand scan range to fill rectangular screen area in isometric view
+		int scanRadius = (int)(ViewRadius * 1.5f);
+
+		// Draw floor tiles and wall outlines in isometric view
+		for (int dx = -scanRadius; dx < scanRadius; dx++)
 		{
-			for (int dy = -ViewRadius; dy < ViewRadius; dy++)
+			for (int dy = -scanRadius; dy < scanRadius; dy++)
 			{
 				int worldX = playerTile.X + dx;
 				int worldY = playerTile.Y + dy;
@@ -208,55 +227,36 @@ public partial class Minimap : Control
 
 				if (!_explored![worldX, worldY]) continue;
 
-				// Calculate screen position (centered on player)
-				int screenX = imageCenter + dx * TileSize;
-				int screenY = imageCenter + dy * TileSize;
+				// Convert to isometric coordinates
+				Vector2I isoPos = ToIsometric(dx, dy);
+				int screenX = imageCenterX + isoPos.X;
+				int screenY = imageCenterY + isoPos.Y;
 
-				// Only draw outlines for floor tiles that border walls
+				// Draw floor tiles as isometric diamonds
 				if (_dungeonFloor.IsFloor(worldX, worldY))
 				{
-					// Check each direction for walls and draw edge lines
-					// Top edge
+					DrawIsometricTile(screenX, screenY, _floorColor);
+
+					// Draw wall edges on the isometric tile
+					// Top-left edge (was top edge in normal view)
 					if (worldY > 0 && _dungeonFloor.IsWall(worldX, worldY - 1))
 					{
-						DrawHorizontalLine(screenX, screenY, TileSize, _wallOutlineColor);
+						DrawIsometricEdgeTopLeft(screenX, screenY, _wallOutlineColor);
 					}
-					// Bottom edge
+					// Bottom-right edge (was bottom edge)
 					if (worldY < _mapHeight - 1 && _dungeonFloor.IsWall(worldX, worldY + 1))
 					{
-						DrawHorizontalLine(screenX, screenY + TileSize, TileSize, _wallOutlineColor);
+						DrawIsometricEdgeBottomRight(screenX, screenY, _wallOutlineColor);
 					}
-					// Left edge
+					// Top-right edge (was left edge)
 					if (worldX > 0 && _dungeonFloor.IsWall(worldX - 1, worldY))
 					{
-						DrawVerticalLine(screenX, screenY, TileSize, _wallOutlineColor);
+						DrawIsometricEdgeTopRight(screenX, screenY, _wallOutlineColor);
 					}
-					// Right edge
+					// Bottom-left edge (was right edge)
 					if (worldX < _mapWidth - 1 && _dungeonFloor.IsWall(worldX + 1, worldY))
 					{
-						DrawVerticalLine(screenX + TileSize, screenY, TileSize, _wallOutlineColor);
-					}
-
-					// Diagonal corners for smoother look
-					if (worldX > 0 && worldY > 0 && _dungeonFloor.IsWall(worldX - 1, worldY - 1) &&
-						!_dungeonFloor.IsWall(worldX - 1, worldY) && !_dungeonFloor.IsWall(worldX, worldY - 1))
-					{
-						SetPixelSafe(screenX, screenY, _wallOutlineColor);
-					}
-					if (worldX < _mapWidth - 1 && worldY > 0 && _dungeonFloor.IsWall(worldX + 1, worldY - 1) &&
-						!_dungeonFloor.IsWall(worldX + 1, worldY) && !_dungeonFloor.IsWall(worldX, worldY - 1))
-					{
-						SetPixelSafe(screenX + TileSize, screenY, _wallOutlineColor);
-					}
-					if (worldX > 0 && worldY < _mapHeight - 1 && _dungeonFloor.IsWall(worldX - 1, worldY + 1) &&
-						!_dungeonFloor.IsWall(worldX - 1, worldY) && !_dungeonFloor.IsWall(worldX, worldY + 1))
-					{
-						SetPixelSafe(screenX, screenY + TileSize, _wallOutlineColor);
-					}
-					if (worldX < _mapWidth - 1 && worldY < _mapHeight - 1 && _dungeonFloor.IsWall(worldX + 1, worldY + 1) &&
-						!_dungeonFloor.IsWall(worldX + 1, worldY) && !_dungeonFloor.IsWall(worldX, worldY + 1))
-					{
-						SetPixelSafe(screenX + TileSize, screenY + TileSize, _wallOutlineColor);
+						DrawIsometricEdgeBottomLeft(screenX, screenY, _wallOutlineColor);
 					}
 				}
 			}
@@ -272,7 +272,7 @@ public partial class Minimap : Control
 				int dx = enemyTile.X - playerTile.X;
 				int dy = enemyTile.Y - playerTile.Y;
 
-				if (Math.Abs(dx) < ViewRadius && Math.Abs(dy) < ViewRadius &&
+				if (Math.Abs(dx) < scanRadius && Math.Abs(dy) < scanRadius &&
 					enemyTile.X >= 0 && enemyTile.X < _mapWidth &&
 					enemyTile.Y >= 0 && enemyTile.Y < _mapHeight &&
 					_explored![enemyTile.X, enemyTile.Y])
@@ -280,8 +280,9 @@ public partial class Minimap : Control
 					// Check if enemy is within player's visible range
 					if (Math.Abs(dx) <= RevealRadius && Math.Abs(dy) <= RevealRadius)
 					{
-						int screenX = imageCenter + dx * TileSize + TileSize / 2;
-						int screenY = imageCenter + dy * TileSize + TileSize / 2;
+						Vector2I isoPos = ToIsometric(dx, dy);
+						int screenX = imageCenterX + isoPos.X;
+						int screenY = imageCenterY + isoPos.Y;
 						DrawDotAt(screenX, screenY, _enemyColor, 3);
 					}
 				}
@@ -289,27 +290,94 @@ public partial class Minimap : Control
 		}
 
 		// Draw player marker at center
-		DrawDotAt(imageCenter + TileSize / 2, imageCenter + TileSize / 2, _playerColor, 4);
+		DrawDotAt(imageCenterX, imageCenterY, _playerColor, 5);
 
 		// Update texture
 		_mapTexture.Update(_mapImage);
 	}
 
-	private void DrawHorizontalLine(int x, int y, int length, Color color)
+	private void DrawIsometricTile(int centerX, int centerY, Color color)
 	{
 		if (_mapImage == null) return;
-		for (int i = 0; i < length; i++)
+
+		// Draw a diamond shape for isometric tile
+		int halfWidth = (int)(TileSize * ISO_SCALE);
+		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
+
+		for (int y = -halfHeight; y <= halfHeight; y++)
 		{
-			SetPixelSafe(x + i, y, color);
+			// Calculate width at this height (diamond shape)
+			float ratio = 1.0f - Math.Abs(y) / (float)halfHeight;
+			int width = (int)(halfWidth * ratio);
+
+			for (int x = -width; x <= width; x++)
+			{
+				SetPixelSafe(centerX + x, centerY + y, color);
+			}
 		}
 	}
 
-	private void DrawVerticalLine(int x, int y, int length, Color color)
+	private void DrawIsometricEdgeTopLeft(int centerX, int centerY, Color color)
 	{
 		if (_mapImage == null) return;
-		for (int i = 0; i < length; i++)
+		int halfWidth = (int)(TileSize * ISO_SCALE);
+		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
+
+		// Draw line from top to left corner
+		for (int i = 0; i <= halfWidth; i++)
 		{
-			SetPixelSafe(x, y + i, color);
+			int x = centerX - i;
+			int y = centerY - halfHeight + (int)(i * ISO_HEIGHT_RATIO);
+			SetPixelSafe(x, y, color);
+			SetPixelSafe(x, y + 1, color);
+		}
+	}
+
+	private void DrawIsometricEdgeTopRight(int centerX, int centerY, Color color)
+	{
+		if (_mapImage == null) return;
+		int halfWidth = (int)(TileSize * ISO_SCALE);
+		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
+
+		// Draw line from top to right corner
+		for (int i = 0; i <= halfWidth; i++)
+		{
+			int x = centerX + i;
+			int y = centerY - halfHeight + (int)(i * ISO_HEIGHT_RATIO);
+			SetPixelSafe(x, y, color);
+			SetPixelSafe(x, y + 1, color);
+		}
+	}
+
+	private void DrawIsometricEdgeBottomLeft(int centerX, int centerY, Color color)
+	{
+		if (_mapImage == null) return;
+		int halfWidth = (int)(TileSize * ISO_SCALE);
+		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
+
+		// Draw line from left corner to bottom
+		for (int i = 0; i <= halfWidth; i++)
+		{
+			int x = centerX - halfWidth + i;
+			int y = centerY + (int)(i * ISO_HEIGHT_RATIO);
+			SetPixelSafe(x, y, color);
+			SetPixelSafe(x, y - 1, color);
+		}
+	}
+
+	private void DrawIsometricEdgeBottomRight(int centerX, int centerY, Color color)
+	{
+		if (_mapImage == null) return;
+		int halfWidth = (int)(TileSize * ISO_SCALE);
+		int halfHeight = (int)(TileSize * ISO_SCALE * ISO_HEIGHT_RATIO);
+
+		// Draw line from right corner to bottom
+		for (int i = 0; i <= halfWidth; i++)
+		{
+			int x = centerX + halfWidth - i;
+			int y = centerY + (int)(i * ISO_HEIGHT_RATIO);
+			SetPixelSafe(x, y, color);
+			SetPixelSafe(x, y - 1, color);
 		}
 	}
 
