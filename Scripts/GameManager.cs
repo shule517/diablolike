@@ -72,6 +72,9 @@ public partial class GameManager : Node
             CurrentFloor.Visible = true;
             CurrentFloor.ProcessMode = ProcessModeEnum.Inherit;
 
+            // Reset enemies and items when re-entering dungeon
+            CurrentFloor.ResetEntities();
+
             // Disable town portal temporarily when re-entering dungeon
             var townPortal = CurrentFloor.GetNodeOrNull<Area2D>("TownPortal");
             if (townPortal != null)

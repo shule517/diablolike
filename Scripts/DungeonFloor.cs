@@ -491,6 +491,34 @@ public partial class DungeonFloor : Node2D
         AddChild(torch);
     }
 
+    public void ResetEntities()
+    {
+        // Remove all existing enemies
+        foreach (var node in GetTree().GetNodesInGroup("enemies"))
+        {
+            if (IsInstanceValid(node))
+            {
+                node.QueueFree();
+            }
+        }
+
+        // Remove all existing items
+        var items = GetChildren();
+        foreach (var child in items)
+        {
+            if (child is Item item && IsInstanceValid(item))
+            {
+                item.QueueFree();
+            }
+        }
+
+        // Respawn enemies after a short delay to ensure cleanup is complete
+        GetTree().CreateTimer(0.1).Timeout += () =>
+        {
+            SpawnEnemies();
+        };
+    }
+
     private void SpawnEnemies()
     {
         var enemyScene = GD.Load<PackedScene>("res://Scenes/Enemy.tscn");

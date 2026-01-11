@@ -41,6 +41,7 @@ public partial class Enemy : CharacterBody2D
 
 	public override void _Ready()
 	{
+		AddToGroup("enemies");
 		CurrentHealth = MaxHealth;
 		_sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
 		_navigationAgent = GetNodeOrNull<NavigationAgent2D>("NavigationAgent2D");
