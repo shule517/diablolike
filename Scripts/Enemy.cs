@@ -6,7 +6,7 @@ public partial class Enemy : CharacterBody2D
 	[Export] public float Speed = 80.0f;
 	[Export] public int MaxHealth = 30;
 	[Export] public int AttackDamage = 5;
-	[Export] public float AttackRange = 30.0f;
+	[Export] public float AttackRange = 40.0f;
 	[Export] public float AttackCooldown = 1.0f;
 	[Export] public float DetectionRange = 200.0f;
 	[Export] public int ExperienceValue = 25;
@@ -22,6 +22,8 @@ public partial class Enemy : CharacterBody2D
 	private bool _isDead = false;
 	private bool _isFlashing = false;
 	private bool _isAttacking = false;
+	private float _attackingTime = 0.0f;
+	private const float MAX_ATTACKING_TIME = 1.0f; // Safety timeout
 	private Node2D? _attackIndicator;
 
 	private enum State
@@ -70,6 +72,22 @@ public partial class Enemy : CharacterBody2D
 		if (_attackTimer > 0)
 		{
 			_attackTimer -= (float)delta;
+		}
+
+		// Safety: Reset _isAttacking if it's been too long
+		if (_isAttacking)
+		{
+			_attackingTime += (float)delta;
+			if (_attackingTime > MAX_ATTACKING_TIME)
+			{
+				_isAttacking = false;
+				_attackingTime = 0.0f;
+				if (_attackIndicator != null && IsInstanceValid(_attackIndicator))
+				{
+					_attackIndicator.QueueFree();
+					_attackIndicator = null;
+				}
+			}
 		}
 
 		UpdateState();
@@ -166,6 +184,7 @@ public partial class Enemy : CharacterBody2D
 			return;
 
 		_isAttacking = true;
+		_attackingTime = 0.0f;
 		_attackTimer = AttackCooldown;
 		PlayAnimation("attack");
 
@@ -173,9 +192,13 @@ public partial class Enemy : CharacterBody2D
 		ShowAttackIndicator();
 	}
 
-	private void ShowAttackIndicator()
+	private async void ShowAttackIndicator()
 	{
-		if (_target == null) return;
+		if (_target == null)
+		{
+			_isAttacking = false;
+			return;
+		}
 
 		// Create attack indicator pointing at player
 		_attackIndicator = new Node2D();
@@ -216,11 +239,19 @@ public partial class Enemy : CharacterBody2D
 
 		GetParent().AddChild(_attackIndicator);
 
-		// Flash the indicator and then attack
-		var tween = _attackIndicator.CreateTween();
-		tween.TweenProperty(warningCircle, "color:a", 0.6f, 0.15f);
-		tween.TweenProperty(warningCircle, "color:a", 0.2f, 0.15f);
-		tween.TweenCallback(Callable.From(() => ExecuteAttack()));
+		// Flash animation using timer (more reliable than tween callback)
+		warningCircle.Color = new Color(1.0f, 0.2f, 0.1f, 0.5f);
+
+		await ToSignal(GetTree().CreateTimer(0.15), SceneTreeTimer.SignalName.Timeout);
+		if (!IsInstanceValid(this) || _isDead) return;
+
+		if (IsInstanceValid(warningCircle))
+			warningCircle.Color = new Color(1.0f, 0.2f, 0.1f, 0.7f);
+
+		await ToSignal(GetTree().CreateTimer(0.15), SceneTreeTimer.SignalName.Timeout);
+		if (!IsInstanceValid(this) || _isDead) return;
+
+		ExecuteAttack();
 	}
 
 	private void ExecuteAttack()
@@ -236,7 +267,7 @@ public partial class Enemy : CharacterBody2D
 		if (_target != null && IsInstanceValid(_target))
 		{
 			float distanceToPlayer = GlobalPosition.DistanceTo(_target.GlobalPosition);
-			if (distanceToPlayer <= AttackRange * 1.2f) // Small grace margin
+			if (distanceToPlayer <= AttackRange * 1.5f) // Grace margin for close combat
 			{
 				_target.TakeDamage(AttackDamage);
 				ShowAttackEffect();
@@ -244,6 +275,7 @@ public partial class Enemy : CharacterBody2D
 		}
 
 		_isAttacking = false;
+		_attackingTime = 0.0f;
 	}
 
 	private void ShowAttackEffect()
