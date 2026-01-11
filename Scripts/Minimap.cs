@@ -4,10 +4,10 @@ using System.Collections.Generic;
 
 public partial class Minimap : Control
 {
-	[Export] public int TileSize = 12; // Size of each tile on minimap
+	[Export] public int TileSize = 9; // Size of each tile on minimap
 	[Export] public float RevealRadius = 20.0f; // Tiles revealed around player
 	[Export] public int ViewRadius = 60; // How many tiles to show around player
-	[Export] public int SampleRate = 4; // Only draw every Nth tile
+	[Export] public int SampleRate = 3; // Only draw every Nth tile
 
 	private Image? _mapImage;
 	private ImageTexture? _mapTexture;
@@ -278,16 +278,13 @@ public partial class Minimap : Control
 
 				if (hasWallEdge)
 				{
-					// Draw wall edge - use world position for consistent pattern
-					DrawPixelArt(screenX, screenY, _caretColor, worldX, worldY);
+					// Wall edge = light block
+					DrawPixelArt(screenX, screenY, _caretColor, worldX, worldY, false);
 				}
 				else
 				{
-					// Draw floor as dim pixel (sparse)
-					if ((worldX + worldY) % 4 == 0)
-					{
-						DrawPixelArt(screenX, screenY, _floorDotColor, worldX, worldY);
-					}
+					// Corridor/floor = dark block (show all to visualize corridors)
+					DrawPixelArt(screenX, screenY, _caretColor, worldX, worldY, true);
 				}
 			}
 		}
@@ -428,22 +425,25 @@ public partial class Minimap : Control
 	}
 
 	// Draw pixel art piece (mountain style, 2 colors only: light and dark)
-	private void DrawPixelArt(int x, int y, Color color, int worldX, int worldY)
+	private void DrawPixelArt(int x, int y, Color color, int worldX, int worldY, bool isDark)
 	{
 		// Only 2 brightness levels
 		Color lightColor = color;
 		Color darkColor = new Color(color.R * 0.5f, color.G * 0.5f, color.B * 0.5f, color.A);
 
-		// Mountain/pyramid piece only
-		//     ##
-		//   ######
-		//  ########
-		// ##########
-		// Top 3 rows (light)
-		DrawBlock(x + 4, y, 2, lightColor);
-		DrawBlock(x + 2, y + 2, 6, lightColor);
-		DrawBlock(x + 1, y + 4, 8, lightColor);
-		// Bottom row (dark)
-		DrawBlock(x, y + 6, 10, darkColor);
+		// Choose main color based on isDark (wall edge = light, corridor = dark)
+		Color mainColor = isDark ? darkColor : lightColor;
+		Color bottomColor = darkColor; // Bottom always dark for depth
+
+		// Medium mountain/pyramid piece
+		//    ##
+		//  ######
+		// ########
+		// Top row
+		DrawBlock(x + 3, y, 2, mainColor);
+		// Middle row
+		DrawBlock(x + 1, y + 2, 6, mainColor);
+		// Bottom row
+		DrawBlock(x, y + 4, 8, bottomColor);
 	}
 }
