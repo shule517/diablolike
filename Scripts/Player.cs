@@ -112,11 +112,6 @@ public partial class Player : CharacterBody2D
 			_attackTimer -= (float)delta;
 		}
 
-		if (_isAttacking)
-		{
-			return;
-		}
-
 		Vector2 velocity = Vector2.Zero;
 
 		// Get gamepad stick input directly for smooth analog movement
@@ -148,11 +143,19 @@ public partial class Player : CharacterBody2D
 		{
 			velocity = velocity.Normalized() * Speed;
 			_facingDirection = velocity.Normalized();
-			PlayAnimation("walk");
+			// Don't override animation while attacking
+			if (!_isAttacking)
+			{
+				PlayAnimation("walk");
+			}
 		}
 		else
 		{
-			PlayAnimation("idle");
+			// Don't override animation while attacking
+			if (!_isAttacking)
+			{
+				PlayAnimation("idle");
+			}
 		}
 
 		Velocity = velocity;
