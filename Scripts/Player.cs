@@ -43,6 +43,9 @@ public partial class Player : CharacterBody2D
 	private AnimatedSprite2D? _sprite;
 	private Area2D? _attackArea;
 	private ColorRect? _placeholder;
+	private AudioStreamPlayer2D? _damageSound;
+	private AudioStreamPlayer2D? _levelUpSound;
+	private Texture2D? _levelUpTexture;
 	private Vector2 _facingDirection = Vector2.Right;
 	private bool _usingGamepad = false;
 
@@ -75,6 +78,9 @@ public partial class Player : CharacterBody2D
 		_sprite = GetNodeOrNull<AnimatedSprite2D>("AnimatedSprite2D");
 		_attackArea = GetNodeOrNull<Area2D>("AttackArea");
 		_placeholder = GetNodeOrNull<ColorRect>("Placeholder");
+		_damageSound = GetNodeOrNull<AudioStreamPlayer2D>("DamageSound");
+		_levelUpSound = GetNodeOrNull<AudioStreamPlayer2D>("LevelUpSound");
+		_levelUpTexture = GD.Load<Texture2D>("res://Assets/player/levelup.png");
 
 		if (_attackArea != null)
 		{
@@ -152,19 +158,38 @@ public partial class Player : CharacterBody2D
 		Velocity = velocity;
 		MoveAndSlide();
 
-		// Face direction based on input type
+		// Face direction based on input type (flip sprite, don't rotate)
+		UpdateFacingDirection();
+	}
+
+	private void UpdateFacingDirection()
+	{
+		// Update internal facing direction (360 degrees)
 		if (_usingGamepad)
 		{
-			// Face movement direction when using gamepad
-			if (_facingDirection != Vector2.Zero)
-			{
-				Rotation = _facingDirection.Angle();
-			}
+			// _facingDirection is already set from movement
 		}
 		else
 		{
-			// Face mouse direction when using keyboard/mouse
-			LookAt(GetGlobalMousePosition());
+			// Face mouse direction
+			Vector2 toMouse = GetGlobalMousePosition() - GlobalPosition;
+			if (toMouse.Length() > 0)
+			{
+				_facingDirection = toMouse.Normalized();
+			}
+		}
+
+		// Flip sprite based on horizontal direction only (graphics only)
+		if (_sprite != null && _facingDirection.X != 0)
+		{
+			_sprite.FlipH = _facingDirection.X < 0;
+		}
+
+		// Update attack area position based on 360 degree facing direction
+		if (_attackArea != null)
+		{
+			float attackOffset = 30.0f;
+			_attackArea.Position = _facingDirection * attackOffset;
 		}
 	}
 
@@ -197,7 +222,7 @@ public partial class Player : CharacterBody2D
 	{
 		_isAttacking = true;
 		_attackTimer = AttackCooldown;
-		PlayAnimation("attack");
+		PlayAnimation("soil");
 
 		if (_attackArea != null)
 		{
@@ -220,19 +245,22 @@ public partial class Player : CharacterBody2D
 		// Create attack arc visual
 		var attackVisual = new Polygon2D();
 
+		// Use 360 degree facing direction
+		float baseAngle = _facingDirection.Angle();
+
 		// Create arc shape points
 		var points = new Vector2[12];
-		float startAngle = -Mathf.Pi / 4;
-		float endAngle = Mathf.Pi / 4;
+		float arcSpread = Mathf.Pi / 4; // 45 degrees each side
 		float radius = 50.0f;
+		float offset = 30.0f;
 
 		points[0] = Vector2.Zero;
 		for (int i = 0; i < 11; i++)
 		{
-			float angle = startAngle + (endAngle - startAngle) * i / 10.0f;
+			float angle = baseAngle - arcSpread + (arcSpread * 2) * i / 10.0f;
 			points[i + 1] = new Vector2(
-				Mathf.Cos(angle) * radius + 30,
-				Mathf.Sin(angle) * radius
+				Mathf.Cos(angle) * radius + Mathf.Cos(baseAngle) * offset,
+				Mathf.Sin(angle) * radius + Mathf.Sin(baseAngle) * offset
 			);
 		}
 
@@ -249,8 +277,16 @@ public partial class Player : CharacterBody2D
 
 	private void UseSkill()
 	{
+		_isAttacking = true;
 		CurrentMana -= 10;
 		EmitSignal(SignalName.ManaChanged, CurrentMana, MaxMana);
+		PlayAnimation("water");
+
+		// Reset attacking state after animation
+		GetTree().CreateTimer(0.3).Timeout += () =>
+		{
+			_isAttacking = false;
+		};
 
 		// Create a simple projectile or area effect
 		var skillEffect = new Area2D();
@@ -275,7 +311,7 @@ public partial class Player : CharacterBody2D
 		// Set skill position based on input type
 		if (_usingGamepad)
 		{
-			// Place skill in front of player based on facing direction
+			// Place skill in front of player based on 360 degree facing direction
 			skillEffect.GlobalPosition = GlobalPosition + _facingDirection * 120;
 		}
 		else
@@ -321,6 +357,9 @@ public partial class Player : CharacterBody2D
 		CurrentHealth -= damage;
 		CurrentHealth = Math.Max(0, CurrentHealth);
 		EmitSignal(SignalName.HealthChanged, CurrentHealth, MaxHealth);
+
+		// Play damage sound
+		_damageSound?.Play();
 
 		// Stun effect
 		_isStunned = true;
@@ -415,10 +454,48 @@ public partial class Player : CharacterBody2D
 		CurrentHealth = MaxHealth;
 		CurrentMana = MaxMana;
 
+		// Play level up sound and effect
+		_levelUpSound?.Play();
+		ShowLevelUpEffect();
+
 		EmitSignal(SignalName.LevelUp, Level);
 		EmitSignal(SignalName.StatPointsChanged, StatPoints);
 		EmitSignal(SignalName.HealthChanged, CurrentHealth, MaxHealth);
 		EmitSignal(SignalName.ManaChanged, CurrentMana, MaxMana);
+	}
+
+	private void ShowLevelUpEffect()
+	{
+		if (_levelUpTexture == null) return;
+
+		// Create SpriteFrames for level up animation
+		var spriteFrames = new SpriteFrames();
+		spriteFrames.AddAnimation("levelup");
+		spriteFrames.SetAnimationSpeed("levelup", 10.0f);
+		spriteFrames.SetAnimationLoop("levelup", false);
+
+		// Add 16 frames (96x96 each)
+		for (int i = 0; i < 16; i++)
+		{
+			var atlasTexture = new AtlasTexture();
+			atlasTexture.Atlas = _levelUpTexture;
+			atlasTexture.Region = new Rect2(i * 96, 0, 96, 96);
+			spriteFrames.AddFrame("levelup", atlasTexture);
+		}
+
+		// Create AnimatedSprite2D
+		var levelUpSprite = new AnimatedSprite2D();
+		levelUpSprite.SpriteFrames = spriteFrames;
+		levelUpSprite.TextureFilter = TextureFilterEnum.Nearest;
+		levelUpSprite.Play("levelup");
+
+		AddChild(levelUpSprite);
+
+		// Remove after animation completes
+		levelUpSprite.AnimationFinished += () =>
+		{
+			levelUpSprite.QueueFree();
+		};
 	}
 
 	public bool AddStat(string statName)
