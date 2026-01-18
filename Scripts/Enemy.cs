@@ -187,7 +187,7 @@ public partial class Enemy : CharacterBody2D
 		// Face player
 		if (_sprite != null)
 		{
-			_sprite.FlipH = _target.GlobalPosition.X < GlobalPosition.X;
+			_sprite.FlipH = _target.GlobalPosition.X > GlobalPosition.X;
 		}
 
 		PlayAnimation("walk");

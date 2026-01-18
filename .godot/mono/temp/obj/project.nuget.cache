@@ -1,14 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "5ZRt4UZjqCs=",
+  "dgSpecHash": "dh9UCy+u8gI=",
   "success": true,
-  "projectFilePath": "/Users/shota.suzuki/git/diablolike/DiabloLike2D.csproj",
+  "projectFilePath": "/Users/pixel_hal/git/diablolike/DiabloLike2D.csproj",
   "expectedPackageFiles": [
-    "/Users/shota.suzuki/.nuget/packages/godot.sourcegenerators/4.5.1/godot.sourcegenerators.4.5.1.nupkg.sha512",
-    "/Users/shota.suzuki/.nuget/packages/godotsharp/4.5.1/godotsharp.4.5.1.nupkg.sha512",
-    "/Users/shota.suzuki/.nuget/packages/godotsharpeditor/4.5.1/godotsharpeditor.4.5.1.nupkg.sha512",
-    "/Users/shota.suzuki/.nuget/packages/microsoft.netcore.app.ref/8.0.22/microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
-    "/Users/shota.suzuki/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.22/microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512"
+    "/Users/pixel_hal/.nuget/packages/godot.sourcegenerators/4.5.0/godot.sourcegenerators.4.5.0.nupkg.sha512",
+    "/Users/pixel_hal/.nuget/packages/godotsharp/4.5.0/godotsharp.4.5.0.nupkg.sha512",
+    "/Users/pixel_hal/.nuget/packages/godotsharpeditor/4.5.0/godotsharpeditor.4.5.0.nupkg.sha512"
   ],
   "logs": []
 }
