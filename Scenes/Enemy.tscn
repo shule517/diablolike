@@ -1,39 +1,69 @@
-[gd_scene load_steps=5 format=3 uid="uid://b8k3m2n1p5q7r"]
+[gd_scene load_steps=9 format=3 uid="uid://b8k3m2n1p5q7r"]
 
 [ext_resource type="Script" path="res://Scripts/Enemy.cs" id="1_enemy"]
+[ext_resource type="Texture2D" uid="uid://nezumi_spritesheet" path="res://Assets/nezumi/nezumi.png" id="2_nezumi"]
+[ext_resource type="AudioStream" path="res://Assets/nezumi/nezumi_damage.wav" id="3_damage"]
+[ext_resource type="AudioStream" path="res://Assets/nezumi/nezumi_die.wav" id="4_die"]
+[ext_resource type="AudioStream" path="res://Assets/nezumi/nezumi_move.wav" id="5_move"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 14.0
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_idle0"]
+atlas = ExtResource("2_nezumi")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_walk0"]
+atlas = ExtResource("2_nezumi")
+region = Rect2(16, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_walk1"]
+atlas = ExtResource("2_nezumi")
+region = Rect2(32, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_attack0"]
+atlas = ExtResource("2_nezumi")
+region = Rect2(48, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_attack1"]
+atlas = ExtResource("2_nezumi")
+region = Rect2(64, 0, 16, 16)
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_enemy"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": null
+"texture": SubResource("AtlasTexture_idle0")
 }],
 "loop": true,
 "name": &"idle",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": null
+"texture": SubResource("AtlasTexture_walk0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_walk1")
 }],
 "loop": true,
 "name": &"walk",
-"speed": 8.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": null
+"texture": SubResource("AtlasTexture_attack0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_attack1")
 }],
 "loop": false,
 "name": &"attack",
-"speed": 12.0
+"speed": 10.0
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": null
+"texture": SubResource("AtlasTexture_idle0")
 }],
 "loop": false,
 "name": &"death",
@@ -52,10 +82,13 @@ script = ExtResource("1_enemy")
 shape = SubResource("CircleShape2D_body")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+texture_filter = 1
 sprite_frames = SubResource("SpriteFrames_enemy")
 animation = &"idle"
+scale = Vector2(2, 2)
 
 [node name="Placeholder" type="ColorRect" parent="."]
+visible = false
 offset_left = -14.0
 offset_top = -14.0
 offset_right = 14.0
@@ -78,3 +111,12 @@ collision_mask = 0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
 shape = SubResource("RectangleShape2D_hitbox")
+
+[node name="DamageSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("3_damage")
+
+[node name="DieSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("4_die")
+
+[node name="MoveSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("5_move")

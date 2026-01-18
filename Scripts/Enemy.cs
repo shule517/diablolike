@@ -29,6 +29,15 @@ public partial class Enemy : CharacterBody2D
 	private float _stunTimer = 0.0f;
 	private const float STUN_DURATION = 0.3f; // Stun duration when hit
 
+	// Audio
+	private AudioStreamPlayer2D? _damageSound;
+	private AudioStreamPlayer2D? _dieSound;
+	private AudioStreamPlayer2D? _moveSound;
+	private float _moveSoundTimer = 0.0f;
+	private const float MOVE_SOUND_MIN_INTERVAL = 1.5f;
+	private const float MOVE_SOUND_MAX_INTERVAL = 3.0f;
+	private RandomNumberGenerator _rng = new RandomNumberGenerator();
+
 	private enum State
 	{
 		Idle,
@@ -38,6 +47,7 @@ public partial class Enemy : CharacterBody2D
 	}
 
 	private State _currentState = State.Idle;
+	private State _previousState = State.Idle;
 
 	[Signal]
 	public delegate void DiedEventHandler(Enemy enemy);
@@ -50,6 +60,11 @@ public partial class Enemy : CharacterBody2D
 		_navigationAgent = GetNodeOrNull<NavigationAgent2D>("NavigationAgent2D");
 		_healthBar = GetNodeOrNull<ProgressBar>("HealthBar");
 		_placeholder = GetNodeOrNull<ColorRect>("Placeholder");
+
+		// Audio players
+		_damageSound = GetNodeOrNull<AudioStreamPlayer2D>("DamageSound");
+		_dieSound = GetNodeOrNull<AudioStreamPlayer2D>("DieSound");
+		_moveSound = GetNodeOrNull<AudioStreamPlayer2D>("MoveSound");
 
 		if (_navigationAgent != null)
 		{
@@ -105,6 +120,7 @@ public partial class Enemy : CharacterBody2D
 			}
 		}
 
+		_previousState = _currentState;
 		UpdateState();
 		ProcessState(delta);
 	}
@@ -187,7 +203,30 @@ public partial class Enemy : CharacterBody2D
 		// Face player
 		if (_sprite != null)
 		{
-			_sprite.FlipH = _target.GlobalPosition.X < GlobalPosition.X;
+			_sprite.FlipH = _target.GlobalPosition.X > GlobalPosition.X;
+		}
+
+		// Play move sound on start and occasionally
+		if (_moveSound != null)
+		{
+			if (_previousState != State.Chase)
+			{
+				// Just started chasing - play sound and reset timer
+				_moveSound.Play();
+				_rng.Randomize();
+				_moveSoundTimer = _rng.RandfRange(MOVE_SOUND_MIN_INTERVAL, MOVE_SOUND_MAX_INTERVAL);
+			}
+			else
+			{
+				// Occasionally play sound
+				_moveSoundTimer -= (float)delta;
+				if (_moveSoundTimer <= 0)
+				{
+					_moveSound.Play();
+					_rng.Randomize();
+					_moveSoundTimer = _rng.RandfRange(MOVE_SOUND_MIN_INTERVAL, MOVE_SOUND_MAX_INTERVAL);
+				}
+			}
 		}
 
 		PlayAnimation("walk");
@@ -331,6 +370,9 @@ public partial class Enemy : CharacterBody2D
 		CurrentHealth -= damage;
 		UpdateHealthBar();
 
+		// Play damage sound
+		_damageSound?.Play();
+
 		// Stun effect
 		_isStunned = true;
 		_stunTimer = STUN_DURATION;
@@ -439,6 +481,9 @@ public partial class Enemy : CharacterBody2D
 		_isDead = true;
 		_currentState = State.Dead;
 		_isAttacking = false;
+
+		// Play die sound
+		_dieSound?.Play();
 
 		// Clean up attack indicator if exists
 		if (_attackIndicator != null && IsInstanceValid(_attackIndicator))

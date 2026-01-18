@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/Users/shota.suzuki/git/diablolike/DiabloLike2D.csproj": {}
+    "/Users/pixel_hal/git/diablolike/DiabloLike2D.csproj": {}
   },
   "projects": {
-    "/Users/shota.suzuki/git/diablolike/DiabloLike2D.csproj": {
+    "/Users/pixel_hal/git/diablolike/DiabloLike2D.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/shota.suzuki/git/diablolike/DiabloLike2D.csproj",
+        "projectUniqueName": "/Users/pixel_hal/git/diablolike/DiabloLike2D.csproj",
         "projectName": "DiabloLike2D",
-        "projectPath": "/Users/shota.suzuki/git/diablolike/DiabloLike2D.csproj",
-        "packagesPath": "/Users/shota.suzuki/.nuget/packages/",
-        "outputPath": "/Users/shota.suzuki/git/diablolike/.godot/mono/temp/obj/",
+        "projectPath": "/Users/pixel_hal/git/diablolike/DiabloLike2D.csproj",
+        "packagesPath": "/Users/pixel_hal/.nuget/packages/",
+        "outputPath": "/Users/pixel_hal/git/diablolike/.godot/mono/temp/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/Users/shota.suzuki/.nuget/NuGet/NuGet.Config"
+          "/Users/pixel_hal/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -37,8 +37,7 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        },
-        "SdkAnalysisLevel": "10.0.100"
+        }
       },
       "frameworks": {
         "net8.0": {
@@ -46,17 +45,17 @@
           "dependencies": {
             "Godot.SourceGenerators": {
               "target": "Package",
-              "version": "[4.5.1, )",
+              "version": "[4.5.0, )",
               "autoReferenced": true
             },
             "GodotSharp": {
               "target": "Package",
-              "version": "[4.5.1, )",
+              "version": "[4.5.0, )",
               "autoReferenced": true
             },
             "GodotSharpEditor": {
               "target": "Package",
-              "version": "[4.5.1, )",
+              "version": "[4.5.0, )",
               "autoReferenced": true
             }
           },
@@ -71,22 +70,12 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.101/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/8.0.404/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
