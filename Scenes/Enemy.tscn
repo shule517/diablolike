@@ -1,7 +1,10 @@
-[gd_scene load_steps=6 format=3 uid="uid://b8k3m2n1p5q7r"]
+[gd_scene load_steps=9 format=3 uid="uid://b8k3m2n1p5q7r"]
 
 [ext_resource type="Script" path="res://Scripts/Enemy.cs" id="1_enemy"]
 [ext_resource type="Texture2D" uid="uid://nezumi_spritesheet" path="res://Assets/nezumi/nezumi.png" id="2_nezumi"]
+[ext_resource type="AudioStream" path="res://Assets/nezumi/nezumi_damage.wav" id="3_damage"]
+[ext_resource type="AudioStream" path="res://Assets/nezumi/nezumi_die.wav" id="4_die"]
+[ext_resource type="AudioStream" path="res://Assets/nezumi/nezumi_move.wav" id="5_move"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 14.0
@@ -108,3 +111,12 @@ collision_mask = 0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
 shape = SubResource("RectangleShape2D_hitbox")
+
+[node name="DamageSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("3_damage")
+
+[node name="DieSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("4_die")
+
+[node name="MoveSound" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("5_move")
