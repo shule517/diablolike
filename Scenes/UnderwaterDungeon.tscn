@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://underwater_dungeon_001"]
+
+[ext_resource type="Script" path="res://Scripts/UnderwaterDungeon.cs" id="1_underwaterdungeon"]
+
+[node name="UnderwaterDungeon" type="Node2D"]
+script = ExtResource("1_underwaterdungeon")
+MapWidth = 200
+MapHeight = 150
+TileSize = 16

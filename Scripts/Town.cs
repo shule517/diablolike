@@ -25,6 +25,7 @@ public partial class Town : Node2D
     private Vector2 _dungeonPortalPosition;
     private Vector2 _grasslandPortalPosition;
     private Vector2 _beachPortalPosition;
+    private Vector2 _underwaterDungeonPortalPosition;
 
     public override void _Ready()
     {
@@ -55,6 +56,7 @@ public partial class Town : Node2D
         CreateDungeonPortal();
         CreateGrasslandPortal();
         CreateBeachPortal();
+        CreateUnderwaterDungeonPortal();
     }
 
     private void GenerateTown()
@@ -118,6 +120,12 @@ public partial class Town : Node2D
         // Beach entrance position (left side)
         _beachPortalPosition = new Vector2(
             5 * TileSize + TileSize / 2,
+            plazaCenterY * TileSize + TileSize / 2
+        );
+
+        // Underwater dungeon entrance position (right side)
+        _underwaterDungeonPortalPosition = new Vector2(
+            (TownWidth - 5) * TileSize + TileSize / 2,
             plazaCenterY * TileSize + TileSize / 2
         );
     }
@@ -517,6 +525,78 @@ public partial class Town : Node2D
     private void EnterBeachDeferred()
     {
         GameManager.Instance?.EnterBeach();
+    }
+
+    private void CreateUnderwaterDungeonPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "UnderwaterDungeonPortal";
+        portal.Position = _underwaterDungeonPortalPosition;
+        portal.AddToGroup("underwater_dungeon_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - deep blue portal
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.1f, 0.25f, 0.45f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.15f, 0.35f, 0.55f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Sea Cave";
+        label.Position = new Vector2(-28, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.2f, 0.5f, 0.8f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnUnderwaterDungeonPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnUnderwaterDungeonPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterUnderwaterDungeonDeferred));
+        }
+    }
+
+    private void EnterUnderwaterDungeonDeferred()
+    {
+        GameManager.Instance?.EnterUnderwaterDungeon();
     }
 
     private void AddTownLights()
