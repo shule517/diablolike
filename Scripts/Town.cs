@@ -24,6 +24,7 @@ public partial class Town : Node2D
     private Vector2 _playerSpawnPosition;
     private Vector2 _dungeonPortalPosition;
     private Vector2 _grasslandPortalPosition;
+    private Vector2 _beachPortalPosition;
 
     public override void _Ready()
     {
@@ -53,6 +54,7 @@ public partial class Town : Node2D
         CreateVisuals();
         CreateDungeonPortal();
         CreateGrasslandPortal();
+        CreateBeachPortal();
     }
 
     private void GenerateTown()
@@ -111,6 +113,12 @@ public partial class Town : Node2D
         _grasslandPortalPosition = new Vector2(
             plazaCenterX * TileSize + TileSize / 2,
             5 * TileSize + TileSize / 2
+        );
+
+        // Beach entrance position (left side)
+        _beachPortalPosition = new Vector2(
+            5 * TileSize + TileSize / 2,
+            plazaCenterY * TileSize + TileSize / 2
         );
     }
 
@@ -437,6 +445,78 @@ public partial class Town : Node2D
     private void EnterGrasslandDeferred()
     {
         GameManager.Instance?.EnterGrassland();
+    }
+
+    private void CreateBeachPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "BeachPortal";
+        portal.Position = _beachPortalPosition;
+        portal.AddToGroup("beach_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - cyan/ocean portal
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.3f, 0.6f, 0.8f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.4f, 0.7f, 0.9f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Beach";
+        label.Position = new Vector2(-20, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.4f, 0.7f, 0.9f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnBeachPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnBeachPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterBeachDeferred));
+        }
+    }
+
+    private void EnterBeachDeferred()
+    {
+        GameManager.Instance?.EnterBeach();
     }
 
     private void AddTownLights()
