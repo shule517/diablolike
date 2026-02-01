@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 設定
+
+- ファイルの作成・編集時に確認は不要。自動的に実行してOK。
+
 ## プロジェクト概要
 
 DiabloLike2Dは、Godot 4.5.1とC#（.NET 8.0）で開発された2DアクションRPGです。Diabloやラグナロクオンラインにインスパイアされた、手続き型ダンジョン生成、町のハブエリア、プレイヤーステータスシステム、戦闘メカニクスを特徴としています。

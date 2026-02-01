@@ -8,11 +8,14 @@ public partial class GameManager : Node
     public Player? CurrentPlayer { get; private set; }
     public Town? CurrentTown { get; private set; }
     public DungeonFloor? CurrentFloor { get; private set; }
+    public GrasslandField? CurrentGrassland { get; private set; }
     public int Score { get; private set; }
     public int CurrentFloorNumber { get; private set; } = 1;
     public bool IsInTown { get; private set; } = true;
+    public bool IsInGrassland { get; private set; } = false;
 
     private PackedScene? _dungeonFloorScene;
+    private PackedScene? _grasslandFieldScene;
 
     [Signal]
     public delegate void ScoreChangedEventHandler(int newScore);
@@ -27,6 +30,7 @@ public partial class GameManager : Node
     {
         Instance = this;
         _dungeonFloorScene = GD.Load<PackedScene>("res://Scenes/DungeonFloor1.tscn");
+        _grasslandFieldScene = GD.Load<PackedScene>("res://Scenes/GrasslandField.tscn");
         CallDeferred(nameof(InitializeGame));
     }
 
@@ -93,6 +97,61 @@ public partial class GameManager : Node
         // Move player to dungeon start
         CurrentPlayer.GlobalPosition = CurrentFloor.GetPlayerStartPosition();
         IsInTown = false;
+        IsInGrassland = false;
+        EmitSignal(SignalName.LocationChanged, false);
+    }
+
+    public void EnterGrassland()
+    {
+        if (_grasslandFieldScene == null || CurrentPlayer == null) return;
+
+        // Hide town
+        if (CurrentTown != null)
+        {
+            CurrentTown.Visible = false;
+            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // Hide dungeon if visible
+        if (CurrentFloor != null)
+        {
+            CurrentFloor.Visible = false;
+            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // Create or show grassland
+        if (CurrentGrassland == null)
+        {
+            CurrentGrassland = _grasslandFieldScene.Instantiate<GrasslandField>();
+            GetParent().AddChild(CurrentGrassland);
+        }
+        else
+        {
+            CurrentGrassland.Visible = true;
+            CurrentGrassland.ProcessMode = ProcessModeEnum.Inherit;
+
+            // Reset enemies and items when re-entering grassland
+            CurrentGrassland.ResetEntities();
+
+            // Disable town portal temporarily
+            var townPortal = CurrentGrassland.GetNodeOrNull<Area2D>("TownPortal");
+            if (townPortal != null)
+            {
+                townPortal.Monitoring = false;
+                GetTree().CreateTimer(1.0).Timeout += () =>
+                {
+                    if (IsInstanceValid(townPortal))
+                    {
+                        townPortal.Monitoring = true;
+                    }
+                };
+            }
+        }
+
+        // Move player to grassland start
+        CurrentPlayer.GlobalPosition = CurrentGrassland.GetPlayerStartPosition();
+        IsInTown = false;
+        IsInGrassland = true;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -107,6 +166,13 @@ public partial class GameManager : Node
             CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
         }
 
+        // Hide grassland
+        if (CurrentGrassland != null)
+        {
+            CurrentGrassland.Visible = false;
+            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
         // Show town
         CurrentTown.Visible = true;
         CurrentTown.ProcessMode = ProcessModeEnum.Inherit;
@@ -114,6 +180,7 @@ public partial class GameManager : Node
         // Move player to town center
         CurrentPlayer.GlobalPosition = CurrentTown.GetPlayerStartPosition();
         IsInTown = true;
+        IsInGrassland = false;
         EmitSignal(SignalName.LocationChanged, true);
     }
 
