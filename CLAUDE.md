@@ -38,15 +38,18 @@ dotnet build
 | UnderwaterDungeon.tscn | UnderwaterDungeon.cs | ダンジョン | 海底洞窟。珊瑚、海藻、発光生物 |
 | DemonCastle.tscn | DemonCastle.cs | ダンジョン | 魔王城。石造りの部屋、魔法陣、骸骨 |
 | DemonField.tscn | DemonField.cs | フィールド | 魔界。溶岩、枯れ木、魔法クリスタル |
+| CloudField.tscn | CloudField.cs | フィールド | 雲の上。浮遊島、虹の橋、金色の柱 |
+| CloudKingdom.tscn | CloudKingdom.cs | ダンジョン | 雲の王国。天空の城、白大理石、クリスタル |
 
 ### 町のポータル配置
 ```
-        [Grassland] (上)
-            |
-[Beach] -- [Plaza] -- [Sea Cave]
-(左)        |          (右)
+  [Cloud]   [Grassland]  [Sky Castle] (上)
+    (左上)     (中央)       (右上)
+               |
+[Beach] ---- [Plaza] ---- [Sea Cave]
+(左)           |           (右)
      [Dungeon] [Demon Castle] [Demon Realm]
-            (下)
+               (下)
 ```
 
 ### 主要スクリプト

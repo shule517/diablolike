@@ -28,6 +28,8 @@ public partial class Town : Node2D
     private Vector2 _underwaterDungeonPortalPosition;
     private Vector2 _demonCastlePortalPosition;
     private Vector2 _demonFieldPortalPosition;
+    private Vector2 _cloudFieldPortalPosition;
+    private Vector2 _cloudKingdomPortalPosition;
 
     public override void _Ready()
     {
@@ -61,6 +63,8 @@ public partial class Town : Node2D
         CreateUnderwaterDungeonPortal();
         CreateDemonCastlePortal();
         CreateDemonFieldPortal();
+        CreateCloudFieldPortal();
+        CreateCloudKingdomPortal();
     }
 
     private void GenerateTown()
@@ -143,6 +147,18 @@ public partial class Town : Node2D
         _demonFieldPortalPosition = new Vector2(
             (plazaCenterX + 10) * TileSize + TileSize / 2,
             (TownHeight - 5) * TileSize + TileSize / 2
+        );
+
+        // Cloud field entrance position (top-left, near grassland)
+        _cloudFieldPortalPosition = new Vector2(
+            (plazaCenterX - 10) * TileSize + TileSize / 2,
+            5 * TileSize + TileSize / 2
+        );
+
+        // Cloud kingdom entrance position (top-right, near grassland)
+        _cloudKingdomPortalPosition = new Vector2(
+            (plazaCenterX + 10) * TileSize + TileSize / 2,
+            5 * TileSize + TileSize / 2
         );
     }
 
@@ -757,6 +773,150 @@ public partial class Town : Node2D
     private void EnterDemonFieldDeferred()
     {
         GameManager.Instance?.EnterDemonField();
+    }
+
+    private void CreateCloudFieldPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "CloudFieldPortal";
+        portal.Position = _cloudFieldPortalPosition;
+        portal.AddToGroup("cloud_field_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 白と金色（天空のイメージ）
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.95f, 0.95f, 1.0f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(1.0f, 0.9f, 0.6f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Cloud";
+        label.Position = new Vector2(-18, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(1.0f, 0.95f, 0.8f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnCloudFieldPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnCloudFieldPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterCloudFieldDeferred));
+        }
+    }
+
+    private void EnterCloudFieldDeferred()
+    {
+        GameManager.Instance?.EnterCloudField();
+    }
+
+    private void CreateCloudKingdomPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "CloudKingdomPortal";
+        portal.Position = _cloudKingdomPortalPosition;
+        portal.AddToGroup("cloud_kingdom_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 金と白（天空の城のイメージ）
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(1.0f, 0.95f, 0.85f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(1.0f, 0.85f, 0.5f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Sky Castle";
+        label.Position = new Vector2(-32, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(1.0f, 0.9f, 0.6f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnCloudKingdomPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnCloudKingdomPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterCloudKingdomDeferred));
+        }
+    }
+
+    private void EnterCloudKingdomDeferred()
+    {
+        GameManager.Instance?.EnterCloudKingdom();
     }
 
     private void AddTownLights()
