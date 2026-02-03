@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 設定
 
 - ファイルの作成・編集時に確認は不要。自動的に実行してOK。
+- 新しいフィールド/ダンジョン/機能を実装したら、このCLAUDE.mdも更新すること。
 
 ## プロジェクト概要
 
@@ -24,8 +25,28 @@ dotnet build
 
 ### シーン構造
 - **Main.tscn** - エントリーポイント。GameManager、Town、Player、GameUIを含む
-- **Town.tscn** - プレイヤーが開始するハブエリア。ダンジョンポータルがある
-- **DungeonFloor1.tscn** - アリの巣スタイルの手続き型ダンジョン
+- **Town.tscn** - プレイヤーが開始するハブエリア。各フィールド/ダンジョンへのポータルがある
+
+### フィールド/ダンジョン一覧
+
+| シーン | スクリプト | タイプ | 説明 |
+|--------|-----------|--------|------|
+| DungeonFloor1.tscn | DungeonFloor.cs | ダンジョン | アリの巣スタイルの地下ダンジョン |
+| GrasslandField.tscn | GrasslandField.cs | フィールド | 明るい草原。木、岩、花 |
+| BeachField.tscn | BeachField.cs | フィールド | 砂浜と海。ヤシの木、貝殻、浅瀬 |
+| UnderwaterDungeon.tscn | UnderwaterDungeon.cs | ダンジョン | 海底洞窟。珊瑚、海藻、発光生物 |
+| DemonCastle.tscn | DemonCastle.cs | ダンジョン | 魔王城。石造りの部屋、魔法陣、骸骨 |
+| DemonField.tscn | DemonField.cs | フィールド | 魔界。溶岩、枯れ木、魔法クリスタル |
+
+### 町のポータル配置
+```
+        [Grassland] (上)
+            |
+[Beach] -- [Plaza] -- [Sea Cave]
+(左)        |          (右)
+     [Dungeon] [Demon Castle] [Demon Realm]
+            (下)
+```
 
 ### 主要スクリプト
 

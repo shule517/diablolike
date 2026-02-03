@@ -27,6 +27,7 @@ public partial class Town : Node2D
     private Vector2 _beachPortalPosition;
     private Vector2 _underwaterDungeonPortalPosition;
     private Vector2 _demonCastlePortalPosition;
+    private Vector2 _demonFieldPortalPosition;
 
     public override void _Ready()
     {
@@ -59,6 +60,7 @@ public partial class Town : Node2D
         CreateBeachPortal();
         CreateUnderwaterDungeonPortal();
         CreateDemonCastlePortal();
+        CreateDemonFieldPortal();
     }
 
     private void GenerateTown()
@@ -134,6 +136,12 @@ public partial class Town : Node2D
         // Demon castle entrance position (bottom-left)
         _demonCastlePortalPosition = new Vector2(
             (plazaCenterX - 10) * TileSize + TileSize / 2,
+            (TownHeight - 5) * TileSize + TileSize / 2
+        );
+
+        // Demon field entrance position (bottom-right)
+        _demonFieldPortalPosition = new Vector2(
+            (plazaCenterX + 10) * TileSize + TileSize / 2,
             (TownHeight - 5) * TileSize + TileSize / 2
         );
     }
@@ -677,6 +685,78 @@ public partial class Town : Node2D
     private void EnterDemonCastleDeferred()
     {
         GameManager.Instance?.EnterDemonCastle();
+    }
+
+    private void CreateDemonFieldPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "DemonFieldPortal";
+        portal.Position = _demonFieldPortalPosition;
+        portal.AddToGroup("demon_field_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - dark red/orange portal (lava theme)
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.4f, 0.12f, 0.08f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.55f, 0.18f, 0.12f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Demon Realm";
+        label.Position = new Vector2(-40, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.9f, 0.35f, 0.15f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnDemonFieldPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnDemonFieldPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterDemonFieldDeferred));
+        }
+    }
+
+    private void EnterDemonFieldDeferred()
+    {
+        GameManager.Instance?.EnterDemonField();
     }
 
     private void AddTownLights()
