@@ -42,17 +42,27 @@ dotnet build
 | CloudKingdom.tscn | CloudKingdom.cs | ダンジョン | 雲の王国。天空の城、白大理石、クリスタル |
 | JungleField.tscn | JungleField.cs | フィールド | 南の島。ジャングル、中央に火山、川、溶岩 |
 | VolcanoDungeon.tscn | VolcanoDungeon.cs | ダンジョン | 火山内部。溶岩の川、ファイアクリスタル、黒曜石 |
+| WorldMap.tscn | WorldMap.cs | ワールドマップ | クロノトリガー風の俯瞰マップ。全フィールド/ダンジョンへアクセス可能 |
 
 ### 町のポータル配置
 ```
   [Cloud]   [Grassland]  [Sky Castle] (上)
     (左上)     (中央)       (右上)
+            [Dungeon]
                |
 [Beach] ---- [Plaza] ---- [Sea Cave]
 (左)           |           (右)
-[Jungle]     [Dungeon] [Demon Castle] [Demon Realm]  [Volcano]
-(左下)         (下)                                   (右下)
+[Jungle]  [Demon Castle]  [Demon Realm]  [Volcano]
+(左下)        (下左)        (下右)        (右下)
+           [World Map]
+            (出口・下端)
 ```
+
+### ワールドマップ
+クロノトリガー風の俯瞰型ワールドマップ。小さいプレイヤーマーカーで移動し、各ロケーションに入れる。
+- 地形: 海、浅瀬、砂浜、草原、森、山、雪原、魔界、火山、ジャングル
+- 移動: WASD/矢印キー（海と山は通行不可）
+- 場所に入る: 攻撃ボタン/スペースキー
 
 ### 主要スクリプト
 

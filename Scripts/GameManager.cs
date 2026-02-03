@@ -17,6 +17,7 @@ public partial class GameManager : Node
     public CloudKingdom? CurrentCloudKingdom { get; private set; }
     public JungleField? CurrentJungleField { get; private set; }
     public VolcanoDungeon? CurrentVolcanoDungeon { get; private set; }
+    public WorldMap? CurrentWorldMap { get; private set; }
     public int Score { get; private set; }
     public int CurrentFloorNumber { get; private set; } = 1;
     public bool IsInTown { get; private set; } = true;
@@ -29,6 +30,7 @@ public partial class GameManager : Node
     public bool IsInCloudKingdom { get; private set; } = false;
     public bool IsInJungleField { get; private set; } = false;
     public bool IsInVolcanoDungeon { get; private set; } = false;
+    public bool IsInWorldMap { get; private set; } = false;
 
     private PackedScene? _dungeonFloorScene;
     private PackedScene? _grasslandFieldScene;
@@ -40,6 +42,7 @@ public partial class GameManager : Node
     private PackedScene? _cloudKingdomScene;
     private PackedScene? _jungleFieldScene;
     private PackedScene? _volcanoDungeonScene;
+    private PackedScene? _worldMapScene;
 
     [Signal]
     public delegate void ScoreChangedEventHandler(int newScore);
@@ -63,6 +66,7 @@ public partial class GameManager : Node
         _cloudKingdomScene = GD.Load<PackedScene>("res://Scenes/CloudKingdom.tscn");
         _jungleFieldScene = GD.Load<PackedScene>("res://Scenes/JungleField.tscn");
         _volcanoDungeonScene = GD.Load<PackedScene>("res://Scenes/VolcanoDungeon.tscn");
+        _worldMapScene = GD.Load<PackedScene>("res://Scenes/WorldMap.tscn");
         CallDeferred(nameof(InitializeGame));
     }
 
@@ -90,12 +94,11 @@ public partial class GameManager : Node
     {
         if (_dungeonFloorScene == null || CurrentPlayer == null) return;
 
-        // Hide town
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
+
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // Create or show dungeon
         if (CurrentFloor == null)
@@ -130,6 +133,7 @@ public partial class GameManager : Node
         CurrentPlayer.GlobalPosition = CurrentFloor.GetPlayerStartPosition();
         IsInTown = false;
         IsInGrassland = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -137,19 +141,11 @@ public partial class GameManager : Node
     {
         if (_grasslandFieldScene == null || CurrentPlayer == null) return;
 
-        // Hide town
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // Hide dungeon if visible
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // Create or show grassland
         if (CurrentGrassland == null)
@@ -185,6 +181,7 @@ public partial class GameManager : Node
         IsInTown = false;
         IsInGrassland = true;
         IsInBeach = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -192,26 +189,11 @@ public partial class GameManager : Node
     {
         if (_beachFieldScene == null || CurrentPlayer == null) return;
 
-        // Hide town
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // Hide dungeon if visible
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide grassland if visible
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // Create or show beach
         if (CurrentBeach == null)
@@ -245,6 +227,7 @@ public partial class GameManager : Node
         IsInGrassland = false;
         IsInBeach = true;
         IsInUnderwaterDungeon = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -252,33 +235,11 @@ public partial class GameManager : Node
     {
         if (_underwaterDungeonScene == null || CurrentPlayer == null) return;
 
-        // Hide town
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // Hide dungeon if visible
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide grassland if visible
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide beach if visible
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // Create or show underwater dungeon
         if (CurrentUnderwaterDungeon == null)
@@ -313,6 +274,7 @@ public partial class GameManager : Node
         IsInBeach = false;
         IsInUnderwaterDungeon = true;
         IsInDemonCastle = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -320,40 +282,11 @@ public partial class GameManager : Node
     {
         if (_demonCastleScene == null || CurrentPlayer == null) return;
 
-        // Hide town
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // Hide dungeon if visible
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide grassland if visible
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide beach if visible
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide underwater dungeon if visible
-        if (CurrentUnderwaterDungeon != null)
-        {
-            CurrentUnderwaterDungeon.Visible = false;
-            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // Create or show demon castle
         if (CurrentDemonCastle == null)
@@ -389,6 +322,7 @@ public partial class GameManager : Node
         IsInUnderwaterDungeon = false;
         IsInDemonCastle = true;
         IsInDemonField = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -396,47 +330,11 @@ public partial class GameManager : Node
     {
         if (_demonFieldScene == null || CurrentPlayer == null) return;
 
-        // Hide town
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // Hide dungeon if visible
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide grassland if visible
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide beach if visible
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide underwater dungeon if visible
-        if (CurrentUnderwaterDungeon != null)
-        {
-            CurrentUnderwaterDungeon.Visible = false;
-            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide demon castle if visible
-        if (CurrentDemonCastle != null)
-        {
-            CurrentDemonCastle.Visible = false;
-            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // Create or show demon field
         if (CurrentDemonField == null)
@@ -473,6 +371,7 @@ public partial class GameManager : Node
         IsInDemonCastle = false;
         IsInDemonField = true;
         IsInCloudField = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -480,54 +379,11 @@ public partial class GameManager : Node
     {
         if (_cloudFieldScene == null || CurrentPlayer == null) return;
 
-        // 町を非表示
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // ダンジョンを非表示
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 草原を非表示
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // ビーチを非表示
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 海底ダンジョンを非表示
-        if (CurrentUnderwaterDungeon != null)
-        {
-            CurrentUnderwaterDungeon.Visible = false;
-            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔王城を非表示
-        if (CurrentDemonCastle != null)
-        {
-            CurrentDemonCastle.Visible = false;
-            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔界フィールドを非表示
-        if (CurrentDemonField != null)
-        {
-            CurrentDemonField.Visible = false;
-            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // 雲の上フィールドを作成または表示
         if (CurrentCloudField == null)
@@ -565,6 +421,7 @@ public partial class GameManager : Node
         IsInDemonField = false;
         IsInCloudField = true;
         IsInCloudKingdom = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -572,61 +429,11 @@ public partial class GameManager : Node
     {
         if (_cloudKingdomScene == null || CurrentPlayer == null) return;
 
-        // 町を非表示
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // ダンジョンを非表示
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 草原を非表示
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // ビーチを非表示
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 海底ダンジョンを非表示
-        if (CurrentUnderwaterDungeon != null)
-        {
-            CurrentUnderwaterDungeon.Visible = false;
-            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔王城を非表示
-        if (CurrentDemonCastle != null)
-        {
-            CurrentDemonCastle.Visible = false;
-            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔界フィールドを非表示
-        if (CurrentDemonField != null)
-        {
-            CurrentDemonField.Visible = false;
-            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 雲の上フィールドを非表示
-        if (CurrentCloudField != null)
-        {
-            CurrentCloudField.Visible = false;
-            CurrentCloudField.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // 雲の王国を作成または表示
         if (CurrentCloudKingdom == null)
@@ -665,6 +472,7 @@ public partial class GameManager : Node
         IsInCloudField = false;
         IsInCloudKingdom = true;
         IsInJungleField = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -672,68 +480,11 @@ public partial class GameManager : Node
     {
         if (_jungleFieldScene == null || CurrentPlayer == null) return;
 
-        // 町を非表示
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // ダンジョンを非表示
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 草原を非表示
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // ビーチを非表示
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 海底ダンジョンを非表示
-        if (CurrentUnderwaterDungeon != null)
-        {
-            CurrentUnderwaterDungeon.Visible = false;
-            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔王城を非表示
-        if (CurrentDemonCastle != null)
-        {
-            CurrentDemonCastle.Visible = false;
-            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔界フィールドを非表示
-        if (CurrentDemonField != null)
-        {
-            CurrentDemonField.Visible = false;
-            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 雲の上フィールドを非表示
-        if (CurrentCloudField != null)
-        {
-            CurrentCloudField.Visible = false;
-            CurrentCloudField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 雲の王国を非表示
-        if (CurrentCloudKingdom != null)
-        {
-            CurrentCloudKingdom.Visible = false;
-            CurrentCloudKingdom.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // ジャングルフィールドを作成または表示
         if (CurrentJungleField == null)
@@ -773,6 +524,7 @@ public partial class GameManager : Node
         IsInCloudKingdom = false;
         IsInJungleField = true;
         IsInVolcanoDungeon = false;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -780,75 +532,11 @@ public partial class GameManager : Node
     {
         if (_volcanoDungeonScene == null || CurrentPlayer == null) return;
 
-        // 町を非表示
-        if (CurrentTown != null)
-        {
-            CurrentTown.Visible = false;
-            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // ダンジョンを非表示
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 草原を非表示
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // ビーチを非表示
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 海底ダンジョンを非表示
-        if (CurrentUnderwaterDungeon != null)
-        {
-            CurrentUnderwaterDungeon.Visible = false;
-            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔王城を非表示
-        if (CurrentDemonCastle != null)
-        {
-            CurrentDemonCastle.Visible = false;
-            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 魔界フィールドを非表示
-        if (CurrentDemonField != null)
-        {
-            CurrentDemonField.Visible = false;
-            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 雲の上フィールドを非表示
-        if (CurrentCloudField != null)
-        {
-            CurrentCloudField.Visible = false;
-            CurrentCloudField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // 雲の王国を非表示
-        if (CurrentCloudKingdom != null)
-        {
-            CurrentCloudKingdom.Visible = false;
-            CurrentCloudKingdom.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // ジャングルフィールドを非表示
-        if (CurrentJungleField != null)
-        {
-            CurrentJungleField.Visible = false;
-            CurrentJungleField.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // 火山ダンジョンを作成または表示
         if (CurrentVolcanoDungeon == null)
@@ -888,6 +576,7 @@ public partial class GameManager : Node
         IsInCloudKingdom = false;
         IsInJungleField = false;
         IsInVolcanoDungeon = true;
+        IsInWorldMap = false;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -895,75 +584,11 @@ public partial class GameManager : Node
     {
         if (CurrentTown == null || CurrentPlayer == null) return;
 
-        // Hide dungeon
-        if (CurrentFloor != null)
-        {
-            CurrentFloor.Visible = false;
-            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // 全エリアを非表示
+        HideAllAreas();
 
-        // Hide grassland
-        if (CurrentGrassland != null)
-        {
-            CurrentGrassland.Visible = false;
-            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide beach
-        if (CurrentBeach != null)
-        {
-            CurrentBeach.Visible = false;
-            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide underwater dungeon
-        if (CurrentUnderwaterDungeon != null)
-        {
-            CurrentUnderwaterDungeon.Visible = false;
-            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide demon castle
-        if (CurrentDemonCastle != null)
-        {
-            CurrentDemonCastle.Visible = false;
-            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide demon field
-        if (CurrentDemonField != null)
-        {
-            CurrentDemonField.Visible = false;
-            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide cloud field
-        if (CurrentCloudField != null)
-        {
-            CurrentCloudField.Visible = false;
-            CurrentCloudField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide cloud kingdom
-        if (CurrentCloudKingdom != null)
-        {
-            CurrentCloudKingdom.Visible = false;
-            CurrentCloudKingdom.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide jungle field
-        if (CurrentJungleField != null)
-        {
-            CurrentJungleField.Visible = false;
-            CurrentJungleField.ProcessMode = ProcessModeEnum.Disabled;
-        }
-
-        // Hide volcano dungeon
-        if (CurrentVolcanoDungeon != null)
-        {
-            CurrentVolcanoDungeon.Visible = false;
-            CurrentVolcanoDungeon.ProcessMode = ProcessModeEnum.Disabled;
-        }
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
 
         // Show town
         CurrentTown.Visible = true;
@@ -971,7 +596,145 @@ public partial class GameManager : Node
 
         // Move player to town center
         CurrentPlayer.GlobalPosition = CurrentTown.GetPlayerStartPosition();
+        ResetAllLocationFlags();
         IsInTown = true;
+        EmitSignal(SignalName.LocationChanged, true);
+    }
+
+    /// <summary>
+    /// ワールドマップに入る
+    /// </summary>
+    public void EnterWorldMap(string? fromLocation = null)
+    {
+        if (_worldMapScene == null || CurrentPlayer == null) return;
+
+        // 全てのエリアを非表示
+        HideAllAreas();
+
+        // ワールドマップを作成または表示
+        if (CurrentWorldMap == null)
+        {
+            CurrentWorldMap = _worldMapScene.Instantiate<WorldMap>();
+            GetParent().AddChild(CurrentWorldMap);
+        }
+        else
+        {
+            CurrentWorldMap.Visible = true;
+            CurrentWorldMap.ProcessMode = ProcessModeEnum.Inherit;
+            CurrentWorldMap.EnableMovement();
+        }
+
+        // 出発地点にプレイヤーマーカーを配置
+        if (fromLocation != null)
+        {
+            CurrentWorldMap.SetPlayerPosition(fromLocation);
+        }
+
+        // プレイヤーを非表示（ワールドマップでは専用マーカーを使用）
+        CurrentPlayer.Visible = false;
+        CurrentPlayer.ProcessMode = ProcessModeEnum.Disabled;
+
+        ResetAllLocationFlags();
+        IsInWorldMap = true;
+        EmitSignal(SignalName.LocationChanged, false);
+    }
+
+    /// <summary>
+    /// ワールドマップから町に入る
+    /// </summary>
+    public void EnterTownFromWorldMap()
+    {
+        if (CurrentTown == null || CurrentPlayer == null) return;
+
+        // 全エリアを非表示
+        HideAllAreas();
+
+        // プレイヤーを再表示し、カメラをリセット
+        ShowPlayerAndResetCamera();
+
+        // 町を表示
+        CurrentTown.Visible = true;
+        CurrentTown.ProcessMode = ProcessModeEnum.Inherit;
+
+        CurrentPlayer.GlobalPosition = CurrentTown.GetPlayerStartPosition();
+        ResetAllLocationFlags();
+        IsInTown = true;
+        EmitSignal(SignalName.LocationChanged, true);
+    }
+
+    /// <summary>
+    /// 全てのエリアを非表示にする
+    /// </summary>
+    private void HideAllAreas()
+    {
+        if (CurrentTown != null)
+        {
+            CurrentTown.Visible = false;
+            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentFloor != null)
+        {
+            CurrentFloor.Visible = false;
+            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentGrassland != null)
+        {
+            CurrentGrassland.Visible = false;
+            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentBeach != null)
+        {
+            CurrentBeach.Visible = false;
+            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentUnderwaterDungeon != null)
+        {
+            CurrentUnderwaterDungeon.Visible = false;
+            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentDemonCastle != null)
+        {
+            CurrentDemonCastle.Visible = false;
+            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentDemonField != null)
+        {
+            CurrentDemonField.Visible = false;
+            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentCloudField != null)
+        {
+            CurrentCloudField.Visible = false;
+            CurrentCloudField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentCloudKingdom != null)
+        {
+            CurrentCloudKingdom.Visible = false;
+            CurrentCloudKingdom.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentJungleField != null)
+        {
+            CurrentJungleField.Visible = false;
+            CurrentJungleField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentVolcanoDungeon != null)
+        {
+            CurrentVolcanoDungeon.Visible = false;
+            CurrentVolcanoDungeon.ProcessMode = ProcessModeEnum.Disabled;
+        }
+        if (CurrentWorldMap != null)
+        {
+            CurrentWorldMap.Visible = false;
+            CurrentWorldMap.ProcessMode = ProcessModeEnum.Disabled;
+        }
+    }
+
+    /// <summary>
+    /// 全てのロケーションフラグをリセット
+    /// </summary>
+    private void ResetAllLocationFlags()
+    {
+        IsInTown = false;
         IsInGrassland = false;
         IsInBeach = false;
         IsInUnderwaterDungeon = false;
@@ -981,7 +744,25 @@ public partial class GameManager : Node
         IsInCloudKingdom = false;
         IsInJungleField = false;
         IsInVolcanoDungeon = false;
-        EmitSignal(SignalName.LocationChanged, true);
+        IsInWorldMap = false;
+    }
+
+    /// <summary>
+    /// プレイヤーを再表示し、カメラをリセット
+    /// </summary>
+    private void ShowPlayerAndResetCamera()
+    {
+        if (CurrentPlayer == null) return;
+
+        CurrentPlayer.Visible = true;
+        CurrentPlayer.ProcessMode = ProcessModeEnum.Inherit;
+
+        // カメラのローカル位置をリセット（WorldMapでGlobalPositionを直接設定していたため）
+        var camera = CurrentPlayer.GetNodeOrNull<Camera2D>("Camera2D");
+        if (camera != null)
+        {
+            camera.Position = Vector2.Zero;
+        }
     }
 
     public override void _ExitTree()

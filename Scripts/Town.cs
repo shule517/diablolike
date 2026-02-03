@@ -32,6 +32,7 @@ public partial class Town : Node2D
     private Vector2 _cloudKingdomPortalPosition;
     private Vector2 _jungleFieldPortalPosition;
     private Vector2 _volcanoDungeonPortalPosition;
+    private Vector2 _worldMapPortalPosition;
 
     public override void _Ready()
     {
@@ -69,6 +70,7 @@ public partial class Town : Node2D
         CreateCloudKingdomPortal();
         CreateJungleFieldPortal();
         CreateVolcanoDungeonPortal();
+        CreateWorldMapPortal();
     }
 
     private void GenerateTown()
@@ -117,10 +119,10 @@ public partial class Town : Node2D
         // Inn building (bottom-right)
         CreateBuilding(TownWidth - 16, TownHeight - 14, 8, 6, "Inn");
 
-        // Dungeon entrance position (bottom center)
+        // Dungeon entrance position (plaza内、中央やや上)
         _dungeonPortalPosition = new Vector2(
             plazaCenterX * TileSize + TileSize / 2,
-            (TownHeight - 5) * TileSize + TileSize / 2
+            (plazaCenterY - 5) * TileSize + TileSize / 2
         );
 
         // Grassland entrance position (top center)
@@ -175,6 +177,12 @@ public partial class Town : Node2D
         _volcanoDungeonPortalPosition = new Vector2(
             (TownWidth - 5) * TileSize + TileSize / 2,
             (plazaCenterY + 8) * TileSize + TileSize / 2
+        );
+
+        // World map exit (town edge)
+        _worldMapPortalPosition = new Vector2(
+            plazaCenterX * TileSize + TileSize / 2,
+            (TownHeight - 3) * TileSize + TileSize / 2
         );
     }
 
@@ -1077,6 +1085,59 @@ public partial class Town : Node2D
     private void EnterVolcanoDungeonDeferred()
     {
         GameManager.Instance?.EnterVolcanoDungeon();
+    }
+
+    private void CreateWorldMapPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "WorldMapPortal";
+        portal.Position = _worldMapPortalPosition;
+        portal.AddToGroup("world_map_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new RectangleShape2D();
+        shape.Size = new Vector2(80, 20); // 広い出口
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 道の出口風
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(80, 24);
+        portalBg.Position = new Vector2(-40, -12);
+        portalBg.Color = new Color(0.4f, 0.35f, 0.3f);
+        portal.AddChild(portalBg);
+
+        var arrow = new ColorRect();
+        arrow.Size = new Vector2(20, 12);
+        arrow.Position = new Vector2(-10, -6);
+        arrow.Color = new Color(0.6f, 0.55f, 0.4f);
+        portal.AddChild(arrow);
+
+        var label = new Label();
+        label.Text = "World Map";
+        label.Position = new Vector2(-35, -35);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        portal.BodyEntered += OnWorldMapPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnWorldMapPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterWorldMapDeferred));
+        }
+    }
+
+    private void EnterWorldMapDeferred()
+    {
+        GameManager.Instance?.EnterWorldMap("town");
     }
 
     private void AddTownLights()
