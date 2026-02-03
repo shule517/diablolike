@@ -40,6 +40,7 @@ dotnet build
 | DemonField.tscn | DemonField.cs | フィールド | 魔界。溶岩、枯れ木、魔法クリスタル |
 | CloudField.tscn | CloudField.cs | フィールド | 雲の上。浮遊島、虹の橋、金色の柱 |
 | CloudKingdom.tscn | CloudKingdom.cs | ダンジョン | 雲の王国。天空の城、白大理石、クリスタル |
+| JungleField.tscn | JungleField.cs | フィールド | 南の島。ジャングル、中央に火山、川、溶岩 |
 
 ### 町のポータル配置
 ```
@@ -48,8 +49,8 @@ dotnet build
                |
 [Beach] ---- [Plaza] ---- [Sea Cave]
 (左)           |           (右)
-     [Dungeon] [Demon Castle] [Demon Realm]
-               (下)
+[Jungle]     [Dungeon] [Demon Castle] [Demon Realm]
+(左下)                 (下)
 ```
 
 ### 主要スクリプト

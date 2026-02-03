@@ -15,6 +15,7 @@ public partial class GameManager : Node
     public DemonField? CurrentDemonField { get; private set; }
     public CloudField? CurrentCloudField { get; private set; }
     public CloudKingdom? CurrentCloudKingdom { get; private set; }
+    public JungleField? CurrentJungleField { get; private set; }
     public int Score { get; private set; }
     public int CurrentFloorNumber { get; private set; } = 1;
     public bool IsInTown { get; private set; } = true;
@@ -25,6 +26,7 @@ public partial class GameManager : Node
     public bool IsInDemonField { get; private set; } = false;
     public bool IsInCloudField { get; private set; } = false;
     public bool IsInCloudKingdom { get; private set; } = false;
+    public bool IsInJungleField { get; private set; } = false;
 
     private PackedScene? _dungeonFloorScene;
     private PackedScene? _grasslandFieldScene;
@@ -34,6 +36,7 @@ public partial class GameManager : Node
     private PackedScene? _demonFieldScene;
     private PackedScene? _cloudFieldScene;
     private PackedScene? _cloudKingdomScene;
+    private PackedScene? _jungleFieldScene;
 
     [Signal]
     public delegate void ScoreChangedEventHandler(int newScore);
@@ -55,6 +58,7 @@ public partial class GameManager : Node
         _demonFieldScene = GD.Load<PackedScene>("res://Scenes/DemonField.tscn");
         _cloudFieldScene = GD.Load<PackedScene>("res://Scenes/CloudField.tscn");
         _cloudKingdomScene = GD.Load<PackedScene>("res://Scenes/CloudKingdom.tscn");
+        _jungleFieldScene = GD.Load<PackedScene>("res://Scenes/JungleField.tscn");
         CallDeferred(nameof(InitializeGame));
     }
 
@@ -656,6 +660,114 @@ public partial class GameManager : Node
         IsInDemonField = false;
         IsInCloudField = false;
         IsInCloudKingdom = true;
+        IsInJungleField = false;
+        EmitSignal(SignalName.LocationChanged, false);
+    }
+
+    public void EnterJungleField()
+    {
+        if (_jungleFieldScene == null || CurrentPlayer == null) return;
+
+        // 町を非表示
+        if (CurrentTown != null)
+        {
+            CurrentTown.Visible = false;
+            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // ダンジョンを非表示
+        if (CurrentFloor != null)
+        {
+            CurrentFloor.Visible = false;
+            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 草原を非表示
+        if (CurrentGrassland != null)
+        {
+            CurrentGrassland.Visible = false;
+            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // ビーチを非表示
+        if (CurrentBeach != null)
+        {
+            CurrentBeach.Visible = false;
+            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 海底ダンジョンを非表示
+        if (CurrentUnderwaterDungeon != null)
+        {
+            CurrentUnderwaterDungeon.Visible = false;
+            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 魔王城を非表示
+        if (CurrentDemonCastle != null)
+        {
+            CurrentDemonCastle.Visible = false;
+            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 魔界フィールドを非表示
+        if (CurrentDemonField != null)
+        {
+            CurrentDemonField.Visible = false;
+            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 雲の上フィールドを非表示
+        if (CurrentCloudField != null)
+        {
+            CurrentCloudField.Visible = false;
+            CurrentCloudField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 雲の王国を非表示
+        if (CurrentCloudKingdom != null)
+        {
+            CurrentCloudKingdom.Visible = false;
+            CurrentCloudKingdom.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // ジャングルフィールドを作成または表示
+        if (CurrentJungleField == null)
+        {
+            CurrentJungleField = _jungleFieldScene.Instantiate<JungleField>();
+            GetParent().AddChild(CurrentJungleField);
+        }
+        else
+        {
+            CurrentJungleField.Visible = true;
+            CurrentJungleField.ProcessMode = ProcessModeEnum.Inherit;
+
+            CurrentJungleField.ResetEntities();
+
+            var townPortal = CurrentJungleField.GetNodeOrNull<Area2D>("TownPortal");
+            if (townPortal != null)
+            {
+                townPortal.Monitoring = false;
+                GetTree().CreateTimer(1.0).Timeout += () =>
+                {
+                    if (IsInstanceValid(townPortal))
+                    {
+                        townPortal.Monitoring = true;
+                    }
+                };
+            }
+        }
+
+        CurrentPlayer.GlobalPosition = CurrentJungleField.GetPlayerStartPosition();
+        IsInTown = false;
+        IsInGrassland = false;
+        IsInBeach = false;
+        IsInUnderwaterDungeon = false;
+        IsInDemonCastle = false;
+        IsInDemonField = false;
+        IsInCloudField = false;
+        IsInCloudKingdom = false;
+        IsInJungleField = true;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -719,6 +831,13 @@ public partial class GameManager : Node
             CurrentCloudKingdom.ProcessMode = ProcessModeEnum.Disabled;
         }
 
+        // Hide jungle field
+        if (CurrentJungleField != null)
+        {
+            CurrentJungleField.Visible = false;
+            CurrentJungleField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
         // Show town
         CurrentTown.Visible = true;
         CurrentTown.ProcessMode = ProcessModeEnum.Inherit;
@@ -733,6 +852,7 @@ public partial class GameManager : Node
         IsInDemonField = false;
         IsInCloudField = false;
         IsInCloudKingdom = false;
+        IsInJungleField = false;
         EmitSignal(SignalName.LocationChanged, true);
     }
 
