@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - ファイルの作成・編集時に確認は不要。自動的に実行してOK。
 - 新しいフィールド/ダンジョン/機能を実装したら、このCLAUDE.mdも更新すること。
+- コード内のコメントは日本語で書くこと。
 
 ## プロジェクト概要
 
