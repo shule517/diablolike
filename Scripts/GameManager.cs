@@ -11,17 +11,20 @@ public partial class GameManager : Node
     public GrasslandField? CurrentGrassland { get; private set; }
     public BeachField? CurrentBeach { get; private set; }
     public UnderwaterDungeon? CurrentUnderwaterDungeon { get; private set; }
+    public DemonCastle? CurrentDemonCastle { get; private set; }
     public int Score { get; private set; }
     public int CurrentFloorNumber { get; private set; } = 1;
     public bool IsInTown { get; private set; } = true;
     public bool IsInGrassland { get; private set; } = false;
     public bool IsInBeach { get; private set; } = false;
     public bool IsInUnderwaterDungeon { get; private set; } = false;
+    public bool IsInDemonCastle { get; private set; } = false;
 
     private PackedScene? _dungeonFloorScene;
     private PackedScene? _grasslandFieldScene;
     private PackedScene? _beachFieldScene;
     private PackedScene? _underwaterDungeonScene;
+    private PackedScene? _demonCastleScene;
 
     [Signal]
     public delegate void ScoreChangedEventHandler(int newScore);
@@ -39,6 +42,7 @@ public partial class GameManager : Node
         _grasslandFieldScene = GD.Load<PackedScene>("res://Scenes/GrasslandField.tscn");
         _beachFieldScene = GD.Load<PackedScene>("res://Scenes/BeachField.tscn");
         _underwaterDungeonScene = GD.Load<PackedScene>("res://Scenes/UnderwaterDungeon.tscn");
+        _demonCastleScene = GD.Load<PackedScene>("res://Scenes/DemonCastle.tscn");
         CallDeferred(nameof(InitializeGame));
     }
 
@@ -288,6 +292,82 @@ public partial class GameManager : Node
         IsInGrassland = false;
         IsInBeach = false;
         IsInUnderwaterDungeon = true;
+        IsInDemonCastle = false;
+        EmitSignal(SignalName.LocationChanged, false);
+    }
+
+    public void EnterDemonCastle()
+    {
+        if (_demonCastleScene == null || CurrentPlayer == null) return;
+
+        // Hide town
+        if (CurrentTown != null)
+        {
+            CurrentTown.Visible = false;
+            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // Hide dungeon if visible
+        if (CurrentFloor != null)
+        {
+            CurrentFloor.Visible = false;
+            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // Hide grassland if visible
+        if (CurrentGrassland != null)
+        {
+            CurrentGrassland.Visible = false;
+            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // Hide beach if visible
+        if (CurrentBeach != null)
+        {
+            CurrentBeach.Visible = false;
+            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // Hide underwater dungeon if visible
+        if (CurrentUnderwaterDungeon != null)
+        {
+            CurrentUnderwaterDungeon.Visible = false;
+            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // Create or show demon castle
+        if (CurrentDemonCastle == null)
+        {
+            CurrentDemonCastle = _demonCastleScene.Instantiate<DemonCastle>();
+            GetParent().AddChild(CurrentDemonCastle);
+        }
+        else
+        {
+            CurrentDemonCastle.Visible = true;
+            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Inherit;
+
+            CurrentDemonCastle.ResetEntities();
+
+            var townPortal = CurrentDemonCastle.GetNodeOrNull<Area2D>("TownPortal");
+            if (townPortal != null)
+            {
+                townPortal.Monitoring = false;
+                GetTree().CreateTimer(1.0).Timeout += () =>
+                {
+                    if (IsInstanceValid(townPortal))
+                    {
+                        townPortal.Monitoring = true;
+                    }
+                };
+            }
+        }
+
+        CurrentPlayer.GlobalPosition = CurrentDemonCastle.GetPlayerStartPosition();
+        IsInTown = false;
+        IsInGrassland = false;
+        IsInBeach = false;
+        IsInUnderwaterDungeon = false;
+        IsInDemonCastle = true;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -323,6 +403,13 @@ public partial class GameManager : Node
             CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
         }
 
+        // Hide demon castle
+        if (CurrentDemonCastle != null)
+        {
+            CurrentDemonCastle.Visible = false;
+            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
         // Show town
         CurrentTown.Visible = true;
         CurrentTown.ProcessMode = ProcessModeEnum.Inherit;
@@ -333,6 +420,7 @@ public partial class GameManager : Node
         IsInGrassland = false;
         IsInBeach = false;
         IsInUnderwaterDungeon = false;
+        IsInDemonCastle = false;
         EmitSignal(SignalName.LocationChanged, true);
     }
 
