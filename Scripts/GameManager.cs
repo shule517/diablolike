@@ -16,6 +16,7 @@ public partial class GameManager : Node
     public CloudField? CurrentCloudField { get; private set; }
     public CloudKingdom? CurrentCloudKingdom { get; private set; }
     public JungleField? CurrentJungleField { get; private set; }
+    public VolcanoDungeon? CurrentVolcanoDungeon { get; private set; }
     public int Score { get; private set; }
     public int CurrentFloorNumber { get; private set; } = 1;
     public bool IsInTown { get; private set; } = true;
@@ -27,6 +28,7 @@ public partial class GameManager : Node
     public bool IsInCloudField { get; private set; } = false;
     public bool IsInCloudKingdom { get; private set; } = false;
     public bool IsInJungleField { get; private set; } = false;
+    public bool IsInVolcanoDungeon { get; private set; } = false;
 
     private PackedScene? _dungeonFloorScene;
     private PackedScene? _grasslandFieldScene;
@@ -37,6 +39,7 @@ public partial class GameManager : Node
     private PackedScene? _cloudFieldScene;
     private PackedScene? _cloudKingdomScene;
     private PackedScene? _jungleFieldScene;
+    private PackedScene? _volcanoDungeonScene;
 
     [Signal]
     public delegate void ScoreChangedEventHandler(int newScore);
@@ -59,6 +62,7 @@ public partial class GameManager : Node
         _cloudFieldScene = GD.Load<PackedScene>("res://Scenes/CloudField.tscn");
         _cloudKingdomScene = GD.Load<PackedScene>("res://Scenes/CloudKingdom.tscn");
         _jungleFieldScene = GD.Load<PackedScene>("res://Scenes/JungleField.tscn");
+        _volcanoDungeonScene = GD.Load<PackedScene>("res://Scenes/VolcanoDungeon.tscn");
         CallDeferred(nameof(InitializeGame));
     }
 
@@ -768,6 +772,122 @@ public partial class GameManager : Node
         IsInCloudField = false;
         IsInCloudKingdom = false;
         IsInJungleField = true;
+        IsInVolcanoDungeon = false;
+        EmitSignal(SignalName.LocationChanged, false);
+    }
+
+    public void EnterVolcanoDungeon()
+    {
+        if (_volcanoDungeonScene == null || CurrentPlayer == null) return;
+
+        // 町を非表示
+        if (CurrentTown != null)
+        {
+            CurrentTown.Visible = false;
+            CurrentTown.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // ダンジョンを非表示
+        if (CurrentFloor != null)
+        {
+            CurrentFloor.Visible = false;
+            CurrentFloor.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 草原を非表示
+        if (CurrentGrassland != null)
+        {
+            CurrentGrassland.Visible = false;
+            CurrentGrassland.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // ビーチを非表示
+        if (CurrentBeach != null)
+        {
+            CurrentBeach.Visible = false;
+            CurrentBeach.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 海底ダンジョンを非表示
+        if (CurrentUnderwaterDungeon != null)
+        {
+            CurrentUnderwaterDungeon.Visible = false;
+            CurrentUnderwaterDungeon.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 魔王城を非表示
+        if (CurrentDemonCastle != null)
+        {
+            CurrentDemonCastle.Visible = false;
+            CurrentDemonCastle.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 魔界フィールドを非表示
+        if (CurrentDemonField != null)
+        {
+            CurrentDemonField.Visible = false;
+            CurrentDemonField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 雲の上フィールドを非表示
+        if (CurrentCloudField != null)
+        {
+            CurrentCloudField.Visible = false;
+            CurrentCloudField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 雲の王国を非表示
+        if (CurrentCloudKingdom != null)
+        {
+            CurrentCloudKingdom.Visible = false;
+            CurrentCloudKingdom.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // ジャングルフィールドを非表示
+        if (CurrentJungleField != null)
+        {
+            CurrentJungleField.Visible = false;
+            CurrentJungleField.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
+        // 火山ダンジョンを作成または表示
+        if (CurrentVolcanoDungeon == null)
+        {
+            CurrentVolcanoDungeon = _volcanoDungeonScene.Instantiate<VolcanoDungeon>();
+            GetParent().AddChild(CurrentVolcanoDungeon);
+        }
+        else
+        {
+            CurrentVolcanoDungeon.Visible = true;
+            CurrentVolcanoDungeon.ProcessMode = ProcessModeEnum.Inherit;
+
+            CurrentVolcanoDungeon.ResetEntities();
+
+            var townPortal = CurrentVolcanoDungeon.GetNodeOrNull<Area2D>("TownPortal");
+            if (townPortal != null)
+            {
+                townPortal.Monitoring = false;
+                GetTree().CreateTimer(1.0).Timeout += () =>
+                {
+                    if (IsInstanceValid(townPortal))
+                    {
+                        townPortal.Monitoring = true;
+                    }
+                };
+            }
+        }
+
+        CurrentPlayer.GlobalPosition = CurrentVolcanoDungeon.GetPlayerStartPosition();
+        IsInTown = false;
+        IsInGrassland = false;
+        IsInBeach = false;
+        IsInUnderwaterDungeon = false;
+        IsInDemonCastle = false;
+        IsInDemonField = false;
+        IsInCloudField = false;
+        IsInCloudKingdom = false;
+        IsInJungleField = false;
+        IsInVolcanoDungeon = true;
         EmitSignal(SignalName.LocationChanged, false);
     }
 
@@ -838,6 +958,13 @@ public partial class GameManager : Node
             CurrentJungleField.ProcessMode = ProcessModeEnum.Disabled;
         }
 
+        // Hide volcano dungeon
+        if (CurrentVolcanoDungeon != null)
+        {
+            CurrentVolcanoDungeon.Visible = false;
+            CurrentVolcanoDungeon.ProcessMode = ProcessModeEnum.Disabled;
+        }
+
         // Show town
         CurrentTown.Visible = true;
         CurrentTown.ProcessMode = ProcessModeEnum.Inherit;
@@ -853,6 +980,7 @@ public partial class GameManager : Node
         IsInCloudField = false;
         IsInCloudKingdom = false;
         IsInJungleField = false;
+        IsInVolcanoDungeon = false;
         EmitSignal(SignalName.LocationChanged, true);
     }
 
