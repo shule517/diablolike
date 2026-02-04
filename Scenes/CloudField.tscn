@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://cloud_field_001"]
+
+[ext_resource type="Script" path="res://Scripts/CloudField.cs" id="1_cloudfield"]
+
+[node name="CloudField" type="Node2D"]
+script = ExtResource("1_cloudfield")
+MapWidth = 200
+MapHeight = 150
+TileSize = 16

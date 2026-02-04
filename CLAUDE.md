@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 設定
+
+- ファイルの作成・編集時に確認は不要。自動的に実行してOK。
+- 新しいフィールド/ダンジョン/機能を実装したら、このCLAUDE.mdも更新すること。
+- コード内のコメントは日本語で書くこと。
+
 ## プロジェクト概要
 
 DiabloLike2Dは、Godot 4.5.1とC#（.NET 8.0）で開発された2DアクションRPGです。Diabloやラグナロクオンラインにインスパイアされた、手続き型ダンジョン生成、町のハブエリア、プレイヤーステータスシステム、戦闘メカニクスを特徴としています。
@@ -20,8 +26,43 @@ dotnet build
 
 ### シーン構造
 - **Main.tscn** - エントリーポイント。GameManager、Town、Player、GameUIを含む
-- **Town.tscn** - プレイヤーが開始するハブエリア。ダンジョンポータルがある
-- **DungeonFloor1.tscn** - アリの巣スタイルの手続き型ダンジョン
+- **Town.tscn** - プレイヤーが開始するハブエリア。各フィールド/ダンジョンへのポータルがある
+
+### フィールド/ダンジョン一覧
+
+| シーン | スクリプト | タイプ | 説明 |
+|--------|-----------|--------|------|
+| DungeonFloor1.tscn | DungeonFloor.cs | ダンジョン | アリの巣スタイルの地下ダンジョン |
+| GrasslandField.tscn | GrasslandField.cs | フィールド | 明るい草原。木、岩、花 |
+| BeachField.tscn | BeachField.cs | フィールド | 砂浜と海。ヤシの木、貝殻、浅瀬 |
+| UnderwaterDungeon.tscn | UnderwaterDungeon.cs | ダンジョン | 海底洞窟。珊瑚、海藻、発光生物 |
+| DemonCastle.tscn | DemonCastle.cs | ダンジョン | 魔王城。石造りの部屋、魔法陣、骸骨 |
+| DemonField.tscn | DemonField.cs | フィールド | 魔界。溶岩、枯れ木、魔法クリスタル |
+| CloudField.tscn | CloudField.cs | フィールド | 雲の上。浮遊島、虹の橋、金色の柱 |
+| CloudKingdom.tscn | CloudKingdom.cs | ダンジョン | 雲の王国。天空の城、白大理石、クリスタル |
+| JungleField.tscn | JungleField.cs | フィールド | 南の島。ジャングル、中央に火山、川、溶岩 |
+| VolcanoDungeon.tscn | VolcanoDungeon.cs | ダンジョン | 火山内部。溶岩の川、ファイアクリスタル、黒曜石 |
+| WorldMap.tscn | WorldMap.cs | ワールドマップ | クロノトリガー風の俯瞰マップ。全フィールド/ダンジョンへアクセス可能 |
+
+### 町のポータル配置
+```
+  [Cloud]   [Grassland]  [Sky Castle] (上)
+    (左上)     (中央)       (右上)
+            [Dungeon]
+               |
+[Beach] ---- [Plaza] ---- [Sea Cave]
+(左)           |           (右)
+[Jungle]  [Demon Castle]  [Demon Realm]  [Volcano]
+(左下)        (下左)        (下右)        (右下)
+           [World Map]
+            (出口・下端)
+```
+
+### ワールドマップ
+クロノトリガー風の俯瞰型ワールドマップ。小さいプレイヤーマーカーで移動し、各ロケーションに入れる。
+- 地形: 海、浅瀬、砂浜、草原、森、山、雪原、魔界、火山、ジャングル
+- 移動: WASD/矢印キー（海と山は通行不可）
+- 場所に入る: 攻撃ボタン/スペースキー
 
 ### 主要スクリプト
 

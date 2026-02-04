@@ -23,6 +23,16 @@ public partial class Town : Node2D
 
     private Vector2 _playerSpawnPosition;
     private Vector2 _dungeonPortalPosition;
+    private Vector2 _grasslandPortalPosition;
+    private Vector2 _beachPortalPosition;
+    private Vector2 _underwaterDungeonPortalPosition;
+    private Vector2 _demonCastlePortalPosition;
+    private Vector2 _demonFieldPortalPosition;
+    private Vector2 _cloudFieldPortalPosition;
+    private Vector2 _cloudKingdomPortalPosition;
+    private Vector2 _jungleFieldPortalPosition;
+    private Vector2 _volcanoDungeonPortalPosition;
+    private Vector2 _worldMapPortalPosition;
 
     public override void _Ready()
     {
@@ -51,6 +61,16 @@ public partial class Town : Node2D
         GenerateTown();
         CreateVisuals();
         CreateDungeonPortal();
+        CreateGrasslandPortal();
+        CreateBeachPortal();
+        CreateUnderwaterDungeonPortal();
+        CreateDemonCastlePortal();
+        CreateDemonFieldPortal();
+        CreateCloudFieldPortal();
+        CreateCloudKingdomPortal();
+        CreateJungleFieldPortal();
+        CreateVolcanoDungeonPortal();
+        CreateWorldMapPortal();
     }
 
     private void GenerateTown()
@@ -99,10 +119,70 @@ public partial class Town : Node2D
         // Inn building (bottom-right)
         CreateBuilding(TownWidth - 16, TownHeight - 14, 8, 6, "Inn");
 
-        // Dungeon entrance position (bottom center)
+        // Dungeon entrance position (plaza内、中央やや上)
         _dungeonPortalPosition = new Vector2(
             plazaCenterX * TileSize + TileSize / 2,
+            (plazaCenterY - 5) * TileSize + TileSize / 2
+        );
+
+        // Grassland entrance position (top center)
+        _grasslandPortalPosition = new Vector2(
+            plazaCenterX * TileSize + TileSize / 2,
+            5 * TileSize + TileSize / 2
+        );
+
+        // Beach entrance position (left side)
+        _beachPortalPosition = new Vector2(
+            5 * TileSize + TileSize / 2,
+            plazaCenterY * TileSize + TileSize / 2
+        );
+
+        // Underwater dungeon entrance position (right side)
+        _underwaterDungeonPortalPosition = new Vector2(
+            (TownWidth - 5) * TileSize + TileSize / 2,
+            plazaCenterY * TileSize + TileSize / 2
+        );
+
+        // Demon castle entrance position (bottom-left)
+        _demonCastlePortalPosition = new Vector2(
+            (plazaCenterX - 10) * TileSize + TileSize / 2,
             (TownHeight - 5) * TileSize + TileSize / 2
+        );
+
+        // Demon field entrance position (bottom-right)
+        _demonFieldPortalPosition = new Vector2(
+            (plazaCenterX + 10) * TileSize + TileSize / 2,
+            (TownHeight - 5) * TileSize + TileSize / 2
+        );
+
+        // Cloud field entrance position (top-left, near grassland)
+        _cloudFieldPortalPosition = new Vector2(
+            (plazaCenterX - 10) * TileSize + TileSize / 2,
+            5 * TileSize + TileSize / 2
+        );
+
+        // Cloud kingdom entrance position (top-right, near grassland)
+        _cloudKingdomPortalPosition = new Vector2(
+            (plazaCenterX + 10) * TileSize + TileSize / 2,
+            5 * TileSize + TileSize / 2
+        );
+
+        // Jungle field entrance position (left-bottom, south direction)
+        _jungleFieldPortalPosition = new Vector2(
+            5 * TileSize + TileSize / 2,
+            (plazaCenterY + 8) * TileSize + TileSize / 2
+        );
+
+        // Volcano dungeon entrance position (right-bottom, near jungle)
+        _volcanoDungeonPortalPosition = new Vector2(
+            (TownWidth - 5) * TileSize + TileSize / 2,
+            (plazaCenterY + 8) * TileSize + TileSize / 2
+        );
+
+        // World map exit (town edge)
+        _worldMapPortalPosition = new Vector2(
+            plazaCenterX * TileSize + TileSize / 2,
+            (TownHeight - 3) * TileSize + TileSize / 2
         );
     }
 
@@ -354,6 +434,710 @@ public partial class Town : Node2D
     private void EnterDungeonDeferred()
     {
         GameManager.Instance?.EnterDungeon();
+    }
+
+    private void CreateGrasslandPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "GrasslandPortal";
+        portal.Position = _grasslandPortalPosition;
+        portal.AddToGroup("grassland_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - green nature portal
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.2f, 0.5f, 0.25f);
+        portal.AddChild(portalBg);
+
+        // Portal frame
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.35f, 0.6f, 0.3f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        // Label
+        var label = new Label();
+        label.Text = "Grassland";
+        label.Position = new Vector2(-30, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        // Glow effect
+        var light = new PointLight2D();
+        light.Color = new Color(0.3f, 0.8f, 0.4f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnGrasslandPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnGrasslandPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterGrasslandDeferred));
+        }
+    }
+
+    private void EnterGrasslandDeferred()
+    {
+        GameManager.Instance?.EnterGrassland();
+    }
+
+    private void CreateBeachPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "BeachPortal";
+        portal.Position = _beachPortalPosition;
+        portal.AddToGroup("beach_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - cyan/ocean portal
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.3f, 0.6f, 0.8f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.4f, 0.7f, 0.9f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Beach";
+        label.Position = new Vector2(-20, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.4f, 0.7f, 0.9f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnBeachPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnBeachPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterBeachDeferred));
+        }
+    }
+
+    private void EnterBeachDeferred()
+    {
+        GameManager.Instance?.EnterBeach();
+    }
+
+    private void CreateUnderwaterDungeonPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "UnderwaterDungeonPortal";
+        portal.Position = _underwaterDungeonPortalPosition;
+        portal.AddToGroup("underwater_dungeon_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - deep blue portal
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.1f, 0.25f, 0.45f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.15f, 0.35f, 0.55f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Sea Cave";
+        label.Position = new Vector2(-28, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.2f, 0.5f, 0.8f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnUnderwaterDungeonPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnUnderwaterDungeonPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterUnderwaterDungeonDeferred));
+        }
+    }
+
+    private void EnterUnderwaterDungeonDeferred()
+    {
+        GameManager.Instance?.EnterUnderwaterDungeon();
+    }
+
+    private void CreateDemonCastlePortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "DemonCastlePortal";
+        portal.Position = _demonCastlePortalPosition;
+        portal.AddToGroup("demon_castle_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - dark purple/red portal
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.3f, 0.08f, 0.2f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.45f, 0.12f, 0.35f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Demon Castle";
+        label.Position = new Vector2(-40, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.6f, 0.15f, 0.4f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnDemonCastlePortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnDemonCastlePortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterDemonCastleDeferred));
+        }
+    }
+
+    private void EnterDemonCastleDeferred()
+    {
+        GameManager.Instance?.EnterDemonCastle();
+    }
+
+    private void CreateDemonFieldPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "DemonFieldPortal";
+        portal.Position = _demonFieldPortalPosition;
+        portal.AddToGroup("demon_field_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // Visual - dark red/orange portal (lava theme)
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.4f, 0.12f, 0.08f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.55f, 0.18f, 0.12f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Demon Realm";
+        label.Position = new Vector2(-40, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.9f, 0.35f, 0.15f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnDemonFieldPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnDemonFieldPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterDemonFieldDeferred));
+        }
+    }
+
+    private void EnterDemonFieldDeferred()
+    {
+        GameManager.Instance?.EnterDemonField();
+    }
+
+    private void CreateCloudFieldPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "CloudFieldPortal";
+        portal.Position = _cloudFieldPortalPosition;
+        portal.AddToGroup("cloud_field_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 白と金色（天空のイメージ）
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.95f, 0.95f, 1.0f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(1.0f, 0.9f, 0.6f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Cloud";
+        label.Position = new Vector2(-18, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(1.0f, 0.95f, 0.8f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnCloudFieldPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnCloudFieldPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterCloudFieldDeferred));
+        }
+    }
+
+    private void EnterCloudFieldDeferred()
+    {
+        GameManager.Instance?.EnterCloudField();
+    }
+
+    private void CreateCloudKingdomPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "CloudKingdomPortal";
+        portal.Position = _cloudKingdomPortalPosition;
+        portal.AddToGroup("cloud_kingdom_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 金と白（天空の城のイメージ）
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(1.0f, 0.95f, 0.85f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(1.0f, 0.85f, 0.5f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Sky Castle";
+        label.Position = new Vector2(-32, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(1.0f, 0.9f, 0.6f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnCloudKingdomPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnCloudKingdomPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterCloudKingdomDeferred));
+        }
+    }
+
+    private void EnterCloudKingdomDeferred()
+    {
+        GameManager.Instance?.EnterCloudKingdom();
+    }
+
+    private void CreateJungleFieldPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "JungleFieldPortal";
+        portal.Position = _jungleFieldPortalPosition;
+        portal.AddToGroup("jungle_field_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 緑とオレンジ（ジャングル＋火山）
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.3f, 0.5f, 0.2f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.8f, 0.4f, 0.15f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Jungle";
+        label.Position = new Vector2(-22, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(0.9f, 0.5f, 0.2f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnJungleFieldPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnJungleFieldPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterJungleFieldDeferred));
+        }
+    }
+
+    private void EnterJungleFieldDeferred()
+    {
+        GameManager.Instance?.EnterJungleField();
+    }
+
+    private void CreateVolcanoDungeonPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "VolcanoDungeonPortal";
+        portal.Position = _volcanoDungeonPortalPosition;
+        portal.AddToGroup("volcano_dungeon_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new CircleShape2D();
+        shape.Radius = 24;
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 赤と黒（溶岩＋洞窟）
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(48, 48);
+        portalBg.Position = new Vector2(-24, -24);
+        portalBg.Color = new Color(0.6f, 0.15f, 0.05f);
+        portal.AddChild(portalBg);
+
+        var frame = new ColorRect();
+        frame.Size = new Vector2(56, 56);
+        frame.Position = new Vector2(-28, -28);
+        frame.Color = new Color(0.2f, 0.1f, 0.08f);
+        frame.ZIndex = -1;
+        portal.AddChild(frame);
+
+        var label = new Label();
+        label.Text = "Volcano";
+        label.Position = new Vector2(-26, 30);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        var light = new PointLight2D();
+        light.Color = new Color(1.0f, 0.4f, 0.1f);
+        light.Energy = 0.8f;
+        light.TextureScale = 0.4f;
+
+        var gradientTexture = new GradientTexture2D();
+        var gradient = new Gradient();
+        gradient.SetColor(0, new Color(1, 1, 1, 1));
+        gradient.SetColor(1, new Color(1, 1, 1, 0));
+        gradientTexture.Gradient = gradient;
+        gradientTexture.Width = 128;
+        gradientTexture.Height = 128;
+        gradientTexture.Fill = GradientTexture2D.FillEnum.Radial;
+        gradientTexture.FillFrom = new Vector2(0.5f, 0.5f);
+        gradientTexture.FillTo = new Vector2(0.5f, 0.0f);
+        light.Texture = gradientTexture;
+        portal.AddChild(light);
+
+        portal.BodyEntered += OnVolcanoDungeonPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnVolcanoDungeonPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterVolcanoDungeonDeferred));
+        }
+    }
+
+    private void EnterVolcanoDungeonDeferred()
+    {
+        GameManager.Instance?.EnterVolcanoDungeon();
+    }
+
+    private void CreateWorldMapPortal()
+    {
+        if (_buildingContainer == null) return;
+
+        var portal = new Area2D();
+        portal.Name = "WorldMapPortal";
+        portal.Position = _worldMapPortalPosition;
+        portal.AddToGroup("world_map_portal");
+
+        var collision = new CollisionShape2D();
+        var shape = new RectangleShape2D();
+        shape.Size = new Vector2(80, 20); // 広い出口
+        collision.Shape = shape;
+        portal.AddChild(collision);
+
+        // ポータルビジュアル - 道の出口風
+        var portalBg = new ColorRect();
+        portalBg.Size = new Vector2(80, 24);
+        portalBg.Position = new Vector2(-40, -12);
+        portalBg.Color = new Color(0.4f, 0.35f, 0.3f);
+        portal.AddChild(portalBg);
+
+        var arrow = new ColorRect();
+        arrow.Size = new Vector2(20, 12);
+        arrow.Position = new Vector2(-10, -6);
+        arrow.Color = new Color(0.6f, 0.55f, 0.4f);
+        portal.AddChild(arrow);
+
+        var label = new Label();
+        label.Text = "World Map";
+        label.Position = new Vector2(-35, -35);
+        label.AddThemeColorOverride("font_color", Colors.White);
+        label.AddThemeFontSizeOverride("font_size", 10);
+        portal.AddChild(label);
+
+        portal.BodyEntered += OnWorldMapPortalEntered;
+
+        _buildingContainer.AddChild(portal);
+    }
+
+    private void OnWorldMapPortalEntered(Node2D body)
+    {
+        if (body is Player)
+        {
+            CallDeferred(nameof(EnterWorldMapDeferred));
+        }
+    }
+
+    private void EnterWorldMapDeferred()
+    {
+        GameManager.Instance?.EnterWorldMap("town");
     }
 
     private void AddTownLights()
